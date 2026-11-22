@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>LINE 登入驗證</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f5;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 40px 32px;
+      text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 360px;
+    }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid #e8e8e8;
+      border-top-color: #06c755;
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-text { color: #666; font-size: 0.95rem; }
+    .error-box {
+      background: #fdecec;
+      border: 1px solid #f5c6c6;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .error-title { font-weight: 700; color: #d93025; margin-bottom: 8px; }
+    .error-msg { color: #999; font-size: 0.9rem; }
+    .retry-btn {
+      margin-top: 16px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #06c755;
+      color: #fff;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="app">
+    <div class="spinner"></div>
+    <p class="status-text">正在驗證中...</p>
+  </div>
+
+  <script src="/errorLogging.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script>
+    const app = document.getElementById('app');
+    const loginAttemptKey = 'liffLoginAttemptAt';
+    const returnTargetKey = 'liffReturnTo';
+    const allowedReturnPaths = new Set(['/', '/index.html', '/spendInput.html', '/statistics.html']);
+    const callbackParameters = new URLSearchParams(window.location.search);
+    const callbackFragment = new URLSearchParams(window.location.hash.slice(1));
+    const hasLoginCallback = ['code', 'state', 'liff.state', 'liffClientId', 'error'].some(
+      key => callbackParameters.has(key)
+    ) || ['access_token', 'id_token', 'error'].some(key => callbackFragment.has(key));
+    let loginReady = false;
+    let loginStarted = false;
+    let loginStage = '載入 SDK';
+    let returnTarget = null;
+
+    function validateReturnTarget(value) {
+      if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
+        return null;
+      }
+      const target = new URL(value, window.location.origin);
+      if (target.origin !== window.location.origin || !allowedReturnPaths.has(target.pathname)) {
+        return null;
+      }
+      return target.pathname + target.search + target.hash;
+    }
+
+    function resolveReturnTarget() {
+      // 網址優先；LINE 回呼遺失參數時，使用同分頁登入前保存的目的地。
+      const value = callbackParameters.has('returnTo')
+        ? callbackParameters.get('returnTo')
+        : sessionStorage.getItem(returnTargetKey);
+      const target = validateReturnTarget(value);
+      if (!target) {
+        throw new Error('缺少有效的返回頁面，請從圖文選單重新開啟要使用的頁面');
+      }
+      sessionStorage.setItem(returnTargetKey, target);
+      return target;
+    }
+
+    function returnToOriginalPage(message) {
+      const target = validateReturnTarget(returnTarget);
+      if (!target) {
+        throw new Error('無法確認返回頁面，請從圖文選單重新開啟');
+      }
+      sessionStorage.removeItem(loginAttemptKey);
+      sessionStorage.removeItem(returnTargetKey);
+      // 日誌只記錄頁面路徑，不包含原網址的參數或 fragment。
+      sendLog(message + '，返回 ' + new URL(target, window.location.origin).pathname);
+      window.location.replace(target);
+    }
+
+    function sendLog(msg) {
+      console.info('[login]', msg);
+      sendFrontendLog(msg);
+    }
+
+    function showLoading(text) {
+      app.innerHTML = `<div class="spinner"></div><p class="status-text">${text}</p>`;
+    }
+
+    function showError(msg, error = new Error(msg)) {
+      logError('登入驗證失敗', error, { stage: loginStage, hasLoginCallback });
+      app.replaceChildren();
+      const box = document.createElement('div');
+      box.className = 'error-box';
+      const title = document.createElement('p');
+      title.className = 'error-title';
+      title.textContent = '驗證失敗';
+      const message = document.createElement('p');
+      message.className = 'error-msg';
+      message.textContent = msg;
+      const retry = document.createElement('button');
+      retry.className = 'retry-btn';
+      retry.textContent = '重新登入';
+      retry.addEventListener('click', () => {
+        if (loginReady) {
+          startLogin();
+        } else {
+          window.location.reload();
+        }
+      });
+      box.append(title, message, retry);
+      app.append(box);
+    }
+
+    function startLogin() {
+      if (loginStarted) return;
+      try {
+        loginStage = '導向 LINE 登入';
+        if (liff.isInClient()) {
+          throw new Error('LINE 內的登入尚未完成，請關閉此頁後重新開啟');
+        }
+        // 同一分頁短時間內只自動嘗試一次，手動重試仍可重新登入。
+        sessionStorage.setItem(loginAttemptKey, String(Date.now()));
+        loginStarted = true;
+        sendLog('開始 LINE 登入');
+        showLoading('正在前往 LINE 登入...');
+        const redirectURL = new URL(window.location.pathname, window.location.origin);
+        redirectURL.searchParams.set('returnTo', returnTarget);
+        liff.login({ redirectUri: redirectURL.href });
+      } catch (error) {
+        loginStarted = false;
+        showError(error.message || '無法啟動 LINE 登入', error);
+      }
+    }
+
+    async function init() {
+      // 確認 LIFF SDK 已載入
+      if (typeof liff === 'undefined') {
+        sendLog('LIFF SDK 載入失敗');
+        showError('LIFF SDK 載入失敗，請確認網路連線後重新整理');
+        return;
+      }
+      sendLog('LIFF SDK 載入成功');
+
+      try {
+        loginStage = '確認返回頁面';
+        returnTarget = resolveReturnTarget();
+        // 如果 localStorage 已有 userId，先重新驗證
+        loginStage = '讀取登入狀態';
+        const savedUserId = hasLoginCallback ? null : localStorage.getItem('lineUserId');
+        if (savedUserId) {
+          loginStage = '重新驗證白名單';
+          sendLog('localStorage 有登入狀態，重新驗證中');
+          showLoading('驗證中...');
+          const data = await requestJSON('/api/validate-line-userId', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: savedUserId })
+          }, isValidationResult);
+          if (data.valid) {
+            returnToOriginalPage('重新驗證通過');
+            return;
+          }
+          localStorage.removeItem('lineUserId');
+        }
+
+        // 從後端取得 LIFF_ID
+        showLoading('載入設定中...');
+        loginStage = '取得 LIFF 設定';
+        const config = await requestJSON('/api/liff-config', {},
+          data => data !== null && typeof data === 'object' && typeof data.liffId === 'string');
+        sendLog('已取得 LIFF 設定');
+        if (!config.liffId) {
+          showError('LIFF 未設定，請聯繫管理者');
+          return;
+        }
+
+        // 初始化 LIFF
+        loginStage = '初始化 LIFF';
+        showLoading('初始化 LINE 登入...');
+        sendLog(`開始 liff.init，hasLoginCallback=${hasLoginCallback}`);
+        await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: false });
+        loginReady = true;
+        sendLog(`liff.init 完成, isLoggedIn=${liff.isLoggedIn()}, isInClient=${liff.isInClient()}`);
+
+        if (!liff.isLoggedIn()) {
+          loginStage = '確認 LINE 登入結果';
+          const lastAttempt = Number(sessionStorage.getItem(loginAttemptKey));
+          const recentlyAttempted = lastAttempt > 0 && Date.now() - lastAttempt < 120000;
+          if (hasLoginCallback || recentlyAttempted) {
+            showError('LINE 登入尚未完成，已停止自動跳轉。請按「重新登入」再試一次。');
+            return;
+          }
+          startLogin();
+          return;
+        }
+
+        // 取得使用者資料
+        loginStage = '取得 LINE 使用者資料';
+        showLoading('取得使用者資料...');
+        const profile = await liff.getProfile();
+        sendLog('已取得 LINE 使用者資料');
+
+        // 驗證白名單
+        loginStage = '驗證白名單';
+        showLoading('驗證白名單...');
+        const data = await requestJSON('/api/validate-line-userId', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: profile.userId })
+        }, isValidationResult);
+        sendLog(`白名單驗證結果: valid=${data.valid}`);
+
+        if (!data.valid) {
+          showError('您的 LINE 帳號未被授權使用此服務');
+          return;
+        }
+
+        // 驗證通過，存 userId 並跳轉
+        loginStage = '儲存登入狀態';
+        localStorage.setItem('lineUserId', profile.userId);
+        returnToOriginalPage('驗證通過');
+
+      } catch (err) {
+        showError(err.message || '驗證過程發生錯誤', err);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

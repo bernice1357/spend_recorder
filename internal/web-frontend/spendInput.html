@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>記帳工具</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ===== 上半部：紀錄列表 + 日期 ===== */
+    .top-section {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      background: #fff;
+      border-bottom: 1px solid #eee;
+    }
+
+    .records-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px;
+    }
+    .record-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+    }
+    .record-item .r-icon { font-size: 1.4rem; }
+    .record-item .r-info { flex: 1; }
+    .record-item .r-name { font-size: 0.9rem; font-weight: 600; color: #222; }
+    .record-item .r-note { font-size: 0.75rem; color: #999; display: flex; align-items: center; gap: 4px; }
+    .r-tag {
+      display: inline-block;
+      background: #4a90d9;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      line-height: 1.4;
+    }
+    .record-item .r-amount { font-size: 1rem; font-weight: 700; color: #2e9e5b; }
+    .empty-hint {
+      text-align: center;
+      color: #ccc;
+      font-size: 0.85rem;
+      padding: 24px 0;
+    }
+
+    .date-picker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f5f5f5;
+      border-bottom: 1px solid #eee;
+      flex-shrink: 0;
+      height: 48px;
+      padding: 0 16px;
+      gap: 12px;
+    }
+    .dp-arrow {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      cursor: pointer;
+      border-radius: 50%;
+      background: #e8e8e8;
+      color: #333;
+      user-select: none;
+    }
+    .dp-arrow:active { background: #ddd; }
+    .dp-date-text {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #222;
+      white-space: nowrap;
+    }
+
+    /* ===== 下半部：輸入 ===== */
+    .bottom-section {
+      display: flex;
+      height: 40vh;
+      min-height: 0;
+      box-shadow: 4px 0 8px rgba(0,0,0,0.16), 8px 0 16px rgba(0,0,0,0.23);
+    }
+
+    .category-panel {
+      flex: none;
+      width: 40%;
+      min-width: 0;
+      background: #fff;
+      overflow-y: auto;
+      border-right: 1px solid #eee;
+    }
+    .cat-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: background 0.15s;
+    }
+    .cat-item:active { background: #f9f9f9; }
+    .cat-item.selected {
+      border-color: #1b7f43;
+      background: #d9f2e3;
+    }
+    .cat-item .c-icon { font-size: 1.4rem; }
+    .cat-item .c-name { font-size: 0.95rem; font-weight: 600; color: #222; }
+
+    .cat-add-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      cursor: pointer;
+      color: #2e9e5b;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-top: 1px dashed #ddd;
+    }
+    .cat-add-btn:active { background: #f9f9f9; }
+
+    /* 右半邊 */
+    .input-panel {
+      flex: 1;
+      min-width: 0;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+    }
+
+
+
+    .number-input {
+      flex-shrink: 0;
+      min-width: 0;
+      max-width: 100%;
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #222;
+      outline: none;
+      background: transparent;
+      text-align: right;
+    }
+    .number-input:focus {
+      border-color: #2e9e5b;
+      box-shadow: 0 0 0 1px #2e9e5b;
+    }
+    .ok-btn {
+      flex-shrink: 0;
+      margin-top: auto;
+      border: none;
+      background: #f09030;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 12px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .ok-btn:active { background: #d07820; }
+
+    .tag-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .tag-btn {
+      flex: 1;
+      border: 1px solid #ddd;
+      background: #fff;
+      color: #666;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .tag-btn.active {
+      border-color: #2e9e5b;
+      background: #f6fdf9;
+      color: #2e9e5b;
+    }
+
+    /* 成功提示 */
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2e9e5b;
+      color: #fff;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 99;
+    }
+    .toast.show { opacity: 1; }
+
+    /* 紀錄操作彈窗（編輯 / 刪除） */
+    .action-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 98;
+    }
+    .action-overlay.show { display: flex; }
+    .action-pop {
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px;
+      width: 220px;
+      text-align: center;
+    }
+    .ap-title { font-size: 0.9rem; font-weight: 600; color: #222; margin-bottom: 14px; }
+    .ap-btns { display: flex; gap: 10px; }
+    .ap-btn {
+      flex: 1;
+      border: none;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .ap-btn.edit { background: #e8f0fe; color: #2e6be6; }
+    .ap-btn.del { background: #fdecec; color: #e0453a; }
+    .ap-cancel { margin-top: 12px; border: none; background: none; color: #999; font-size: 0.85rem; cursor: pointer; }
+
+    .category-pop {
+      width: min(340px, calc(100% - 32px));
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+    }
+    .category-label { display: block; text-align: left; margin-bottom: 8px; font-size: 0.9rem; }
+    .category-name-input { width: 100%; text-align: left; font-weight: 400; }
+    .category-submit { background: #2e9e5b; color: #fff; }
+    .category-submit:disabled { opacity: 0.6; cursor: wait; }
+  </style>
+  <script src="/errorLogging.js"></script>
+  <script>
+    const loginURL = '/liffLogin.html?returnTo=' + encodeURIComponent(
+      window.location.pathname + window.location.search + window.location.hash
+    );
+    try {
+      if (!localStorage.getItem('lineUserId')) {
+        window.location.replace(loginURL);
+      }
+    } catch (error) {
+      logError('讀取登入狀態失敗', error);
+      window.location.replace(loginURL);
+    }
+  </script>
+</head>
+<body>
+
+  <!-- 日期列 -->
+  <div class="date-picker" id="date-picker"></div>
+
+  <!-- 上半部 -->
+  <div class="top-section">
+    <div class="records-list" id="records-list">
+      <div class="empty-hint">尚無紀錄</div>
+    </div>
+  </div>
+
+  <!-- 下半部 -->
+  <div class="bottom-section">
+    <div class="category-panel" id="category-panel"></div>
+    <div class="input-panel">
+      <input class="number-input" id="number-input" inputmode="decimal" placeholder="金額" value="0" />
+      <input class="number-input" id="note-input" placeholder="備註" />
+      <div class="tag-row">
+        <button class="tag-btn" onclick="selectTag('尼')">尼</button>
+        <button class="tag-btn" onclick="selectTag('拿')">拿</button>
+        <button class="tag-btn" onclick="selectTag('\u{1F3E0}')" aria-label="房屋">&#x1F3E0;</button>
+      </div>
+      <button class="ok-btn" onclick="pressOK()">確認</button>
+    </div>
+  </div>
+
+  <!-- 紀錄操作彈窗 -->
+  <div class="action-overlay" id="action-overlay">
+    <div class="action-pop">
+      <div class="ap-title" id="ap-title"></div>
+      <div class="ap-btns">
+        <button class="ap-btn edit" onclick="editRecord()">編輯</button>
+        <button class="ap-btn del" onclick="deleteRecord()">刪除</button>
+      </div>
+      <button class="ap-cancel" onclick="hideActions()">取消</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="action-overlay" id="category-overlay">
+    <form class="action-pop category-pop" role="dialog" aria-modal="true"
+        aria-labelledby="category-title" onsubmit="submitCategory(event)">
+      <div class="ap-title" id="category-title">新增分類</div>
+      <label class="category-label" for="category-name">分類名稱</label>
+      <input class="number-input category-name-input" id="category-name"
+        placeholder="輸入分類名稱" required />
+      <label class="category-label" for="category-icon">分類圖示</label>
+      <input class="number-input category-name-input" id="category-icon"
+        placeholder="輸入或貼上 emoji" required />
+      <div class="ap-btns">
+        <button class="ap-btn" type="button" onclick="hideCategoryForm()">取消</button>
+        <button class="ap-btn category-submit" id="category-submit" type="submit">新增</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    document.addEventListener('touchmove', function(e) {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
+    // ---- categories ----
+    let CATEGORIES = [];
+
+    async function fetchCategories() {
+      try {
+        CATEGORIES = await requestJSON('/api/spend-categories', {},
+          data => Array.isArray(data) && data.every(isCategory));
+      } catch (error) {
+        logError('載入分類失敗', error);
+        showToast('分類載入失敗，請重試');
+        if (CATEGORIES.length === 0) {
+          document.getElementById('category-panel').innerHTML = `
+            <div class="empty-hint">分類載入失敗</div>
+            <button class="tag-btn" onclick="fetchCategories()">重新載入分類</button>
+          `;
+        }
+        return;
+      }
+      renderCategories();
+    }
+
+    async function addCategory(name, icon) {
+      const id = 'custom-' + Date.now();
+      try {
+        await requestJSON('/api/spend-categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, name, icon }),
+        }, isCategory);
+        hideCategoryForm();
+        await fetchCategories();
+      } catch (error) {
+        logError('新增分類失敗', error);
+        showToast('新增分類失敗，請稍後再試');
+      }
+    }
+
+    // ---- state ----
+    let selectedCat = null;
+    let selectedTag = null;
+    let selectedRecord = null;
+    let editingId = null;
+    let savingCategory = false;
+    let recentCategoryIds = [];
+    let recentCategoryStorageKey = null;
+
+    let currentDate = new Date();
+    let records = [];
+
+    // ---- init ----
+    const amountInput = document.getElementById('number-input');
+    amountInput.addEventListener('focus', () => {
+      if (amountInput.value === '0') amountInput.value = '';
+    });
+    amountInput.addEventListener('blur', () => {
+      if (!amountInput.value.trim()) amountInput.value = '0';
+    });
+    try {
+      const userId = localStorage.getItem('lineUserId');
+      if (userId) {
+        recentCategoryStorageKey = 'recentCategories:' + userId;
+        const stored = localStorage.getItem(recentCategoryStorageKey);
+        if (stored !== null) {
+          const ids = JSON.parse(stored);
+          if (Array.isArray(ids) && ids.every(id => typeof id === 'string')) {
+            recentCategoryIds = [...new Set(ids)];
+          }
+        } else {
+          const previousId = localStorage.getItem('recentCategory:' + userId);
+          if (previousId) recentCategoryIds = [previousId];
+        }
+      }
+    } catch (error) {
+      logError('讀取最近使用分類失敗', error);
+    }
+    fetchCategories();
+    renderDatePicker();
+    renderDisplay();
+    loadRecords();
+
+    // ---- render ----
+    function renderCategories() {
+      const categoriesById = new Map(CATEGORIES.map(category => [category.id, category]));
+      const recentIds = new Set(recentCategoryIds);
+      const orderedCategories = [
+        ...recentCategoryIds.map(id => categoriesById.get(id)).filter(Boolean),
+        ...CATEGORIES.filter(c => !recentIds.has(c.id)),
+      ];
+      const items = orderedCategories.map(c => `
+        <div class="cat-item ${selectedCat?.id === c.id ? 'selected' : ''}"
+            onclick="selectCategory('${c.id}')">
+          <span class="c-icon">${escapeHTML(c.icon)}</span>
+          <span class="c-name">${c.name}</span>
+        </div>
+      `).join('');
+      document.getElementById('category-panel').innerHTML = items + `
+        <div class="cat-add-btn" onclick="onAddCategory()">
+          <span>＋</span>
+          <span>新增分類</span>
+        </div>
+      `;
+    }
+
+    function onAddCategory() {
+      document.getElementById('category-name').value = '';
+      document.getElementById('category-icon').value = '';
+      document.getElementById('category-overlay').classList.add('show');
+      document.getElementById('category-name').focus();
+    }
+
+    function hideCategoryForm() {
+      document.getElementById('category-overlay').classList.remove('show');
+    }
+
+    async function submitCategory(event) {
+      event.preventDefault();
+      if (savingCategory) return;
+      const input = document.getElementById('category-name');
+      const name = input.value.trim();
+      if (!name) {
+        showToast('請輸入分類名稱');
+        input.focus();
+        return;
+      }
+      const iconInput = document.getElementById('category-icon');
+      const icon = iconInput.value.trim();
+      if (!icon) {
+        showToast('請輸入分類圖示');
+        iconInput.focus();
+        return;
+      }
+      savingCategory = true;
+      const button = document.getElementById('category-submit');
+      button.disabled = true;
+      button.textContent = '新增中…';
+      try {
+        await addCategory(name, icon);
+      } finally {
+        savingCategory = false;
+        button.disabled = false;
+        button.textContent = '新增';
+      }
+    }
+
+    function renderDatePicker() {
+      const today = new Date();
+      const isToday = currentDate.toDateString() === today.toDateString();
+      const y = currentDate.getFullYear();
+      const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const d = String(currentDate.getDate()).padStart(2, '0');
+      const weekNames = ['日','一','二','三','四','五','六'];
+      const week = '星期' + weekNames[currentDate.getDay()];
+      const prefix = isToday ? '今日 ' : '';
+      const text = `${prefix}${y}/${m}/${d} ${week}`;
+
+      document.getElementById('date-picker').innerHTML = `
+        <div class="dp-arrow" onclick="prevDay()">◀</div>
+        <div class="dp-date-text">${text}</div>
+        <div class="dp-arrow" onclick="nextDay()">▶</div>
+      `;
+    }
+
+    function renderDisplay() {}
+
+    function selectTag(tag) {
+      selectedTag = selectedTag === tag ? null : tag;
+      document.querySelectorAll('.tag-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent === selectedTag);
+      });
+    }
+
+    function renderRecords() {
+      const list = document.getElementById('records-list');
+      if (records.length === 0) {
+        list.innerHTML = '<div class="empty-hint">尚無紀錄</div>';
+        return;
+      }
+      list.innerHTML = records.map(r => `
+        <div class="record-item" onclick="showRecordActions(${r.id})">
+          <span class="r-icon">${escapeHTML(r.categoryIcon || '\u{1F4E6}')}</span>
+          <div class="r-info">
+            <div class="r-name">${r.categoryName}</div>
+            ${r.note || r.tag
+              ? `<div class="r-note">${r.note ? r.note : ''}${r.tag
+                ? ` <span class="r-tag">${r.tag}</span>` : ''}</div>` : ''}
+          </div>
+          <span class="r-amount">$${r.amount}</span>
+        </div>
+      `).join('');
+    }
+
+    // ---- actions ----
+    function selectCategory(id) {
+      const cat = CATEGORIES.find(c => c.id === id);
+      selectedCat = selectedCat?.id === id ? null : cat;
+      renderCategories();
+      renderDisplay();
+    }
+
+    // ---- 紀錄操作（編輯 / 刪除） ----
+    function showRecordActions(id) {
+      const rec = records.find(r => r.id === id);
+      if (!rec) return;
+      selectedRecord = rec;
+      document.getElementById('ap-title').textContent = `$${rec.amount} ${rec.categoryName}`;
+      document.getElementById('action-overlay').classList.add('show');
+    }
+
+    function hideActions() {
+      document.getElementById('action-overlay').classList.remove('show');
+      selectedRecord = null;
+    }
+
+    function deleteRecord() {
+      if (!selectedRecord) return;
+      const id = selectedRecord.id;
+      hideActions();
+      if (!confirm('確定刪除這筆紀錄？')) return;
+      requestJSON('/api/records/' + id, { method: 'DELETE' })
+        .then(() => { loadRecords(); showToast('已刪除'); })
+        .catch(error => {
+          logError('刪除紀錄失敗', error);
+          showToast('刪除失敗: ' + error.message);
+        });
+    }
+
+    function editRecord() {
+      if (!selectedRecord) return;
+      const rec = selectedRecord;
+      hideActions();
+      editingId = rec.id;
+      selectedCat = CATEGORIES.find(c => c.id === rec.categoryId)
+        || { id: rec.categoryId, name: rec.categoryName, icon: rec.categoryIcon };
+      const d = rec.date.split('-').map(Number);
+      currentDate = new Date(d[0], d[1] - 1, d[2]);
+      document.getElementById('number-input').value = rec.amount;
+      document.getElementById('note-input').value = rec.note || '';
+      selectedTag = rec.tag || null;
+      document.querySelectorAll('.tag-row .tag-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent === selectedTag);
+      });
+      renderCategories();
+      renderDisplay();
+      renderDatePicker();
+      loadRecords();
+    }
+
+    async function pressOK() {
+      if (!selectedCat) {
+        showToast('請先選分類');
+        return;
+      }
+      const note = document.getElementById('note-input').value.trim();
+      const amount = parseFloat(document.getElementById('number-input').value) || 0;
+
+      const payload = {
+        categoryId:   selectedCat.id,
+        categoryName: selectedCat.name,
+        categoryIcon: selectedCat.icon,
+        note,
+        tag: selectedTag || '',
+        amount,
+        date: formatDate(currentDate),
+      };
+
+      const isEdit = editingId !== null;
+      const url = isEdit ? '/api/records/' + editingId : '/api/records';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      try {
+        if (!isEdit) {
+          const lineUserId = localStorage.getItem('lineUserId');
+          if (!lineUserId || !lineUserId.trim()) {
+            showToast('缺少登入資訊，請重新登入');
+            return;
+          }
+          payload.lineUserId = lineUserId.trim();
+        }
+        const saved = await requestJSON(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }, isRecord);
+        if (isEdit) {
+          const idx = records.findIndex(r => r.id === saved.id);
+          if (idx !== -1) records[idx] = saved;
+        } else {
+          records.unshift(saved);
+        }
+        editingId = null;
+        renderRecords();
+        recentCategoryIds = [saved.categoryId, ...recentCategoryIds.filter(id => id !== saved.categoryId)];
+        try {
+          if (recentCategoryStorageKey) {
+            localStorage.setItem(recentCategoryStorageKey, JSON.stringify(recentCategoryIds));
+          }
+        } catch (error) {
+          logError('保存最近使用分類失敗', error);
+        }
+        renderCategories();
+        document.getElementById('category-panel').scrollTop = 0;
+        document.getElementById('number-input').value = '0';
+        document.getElementById('note-input').value = '';
+        selectedTag = null;
+        document.querySelectorAll('.tag-btn').forEach(btn => btn.classList.remove('active'));
+        renderDisplay();
+        showToast(isEdit ? '已更新' : '已存入');
+      } catch (e) {
+        logError(isEdit ? '更新紀錄失敗' : '新增紀錄失敗', e);
+        showToast((isEdit ? '更新失敗' : '存入失敗') + ': ' + e.message);
+      }
+    }
+
+    function prevDay() {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 1);
+      currentDate = d;
+      renderDatePicker();
+      loadRecords();
+    }
+
+    function nextDay() {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() + 1);
+      currentDate = d;
+      renderDatePicker();
+      loadRecords();
+    }
+
+    // ---- helpers ----
+    function escapeHTML(value) {
+      const element = document.createElement('span');
+      element.textContent = value;
+      return element.innerHTML;
+    }
+
+    function formatDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    async function loadRecords() {
+      try {
+        records = await requestJSON(`/api/records?date=${formatDate(currentDate)}`, {},
+          data => Array.isArray(data) && data.every(isRecord));
+        renderRecords();
+      } catch (error) {
+        logError('載入記帳紀錄失敗', error);
+        document.getElementById('records-list').innerHTML =
+          '<div class="empty-hint">紀錄載入失敗，請重新選擇日期或整理頁面</div>';
+        showToast('紀錄載入失敗');
+      }
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 1500);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>記帳工具</title>
+  <script src="/errorLogging.js"></script>
+  <script>
+    const loginURL = '/liffLogin.html?returnTo=' + encodeURIComponent(
+      window.location.pathname + window.location.search + window.location.hash
+    );
+    try {
+      if (!localStorage.getItem('lineUserId')) {
+        window.location.replace(loginURL);
+      }
+    } catch (error) {
+      logError('讀取登入狀態失敗', error);
+      window.location.replace(loginURL);
+    }
+  </script>
+</head>
+<body>
+  <a href="/spendInput.html">開啟記帳工具</a>
+  <a href="/statistics.html">每月統計</a>
+</body>
+</html>

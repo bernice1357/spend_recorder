@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>每月統計</title>
+  <script src="/errorLogging.js"></script>
+  <script>
+    const loginURL = '/liffLogin.html?returnTo=' + encodeURIComponent(
+      window.location.pathname + window.location.search + window.location.hash
+    );
+    try {
+      if (!localStorage.getItem('lineUserId')) window.location.replace(loginURL);
+    } catch (error) {
+      logError('讀取登入狀態失敗', error);
+      window.location.replace(loginURL);
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #fff;
+      color: #181818;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, a:focus-visible, input:focus-visible {
+      outline: 3px solid #148b9e;
+      outline-offset: 4px;
+    }
+    header { border-bottom: 1px solid #ddd; padding: 20px 16px; }
+    .header-inner { max-width: 680px; margin: auto; display: flex; align-items: center; gap: 16px; }
+    .back { color: inherit; text-decoration: none; white-space: nowrap; }
+    .tabs { display: flex; border: 2px solid #181818; border-radius: 12px; padding: 3px; flex: 1; }
+    .tabs button { flex: 1; padding: 10px 6px; border: 0; border-radius: 8px; background: #fff; font-weight: 700; }
+    .tabs button[aria-pressed="true"] { background: #ffd052; }
+    main { width: min(100% - 32px, 680px); margin: 24px auto 48px; }
+    h1 { font-size: 1rem; margin: 0 0 16px; }
+    .month-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-top: 3px solid #181818;
+      border-bottom: 3px solid #181818;
+      padding: 14px 0;
+    }
+    .month-row button { background: none; border: 0; min-height: 40px; padding: 8px; }
+    .month-row input { min-width: 0; max-width: 180px; border: 0; background: #fff; font-weight: 700; }
+    .currency { color: #666; font-size: 0.8rem; text-align: right; margin: 12px 0; }
+    .chart-toolbar { display: flex; justify-content: flex-end; gap: 8px; }
+    .chart-toolbar button, .retry {
+      background: #fff;
+      border: 1px solid #181818;
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    .chart-toolbar button[aria-pressed="true"] { background: #ffd052; }
+    .total { text-align: center; margin: 24px 0 8px; }
+    .total span { display: block; font-size: 0.9rem; color: #666; }
+    .total strong { display: block; font-size: clamp(1.8rem, 7vw, 2.6rem); overflow-wrap: anywhere; }
+    .chart { margin: 24px auto; }
+    .donut {
+      width: min(100%, 350px);
+      aspect-ratio: 1;
+      margin: auto;
+      border-radius: 50%;
+      border: 3px solid #181818;
+      display: grid;
+      place-items: center;
+    }
+    .donut-center {
+      width: 58%;
+      aspect-ratio: 1;
+      background: #fff;
+      border: 3px solid #181818;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      padding: 8px;
+    }
+    .donut-center strong { font-size: clamp(1rem, 5vw, 1.8rem); overflow-wrap: anywhere; }
+    .donut-center span { font-size: 0.85rem; margin-bottom: 6px; }
+    .card { border: 2px solid #181818; border-radius: 16px; overflow: hidden; margin-top: 24px; }
+    .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 20px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; min-width: 0; }
+    .swatch { width: 14px; height: 14px; flex-shrink: 0; border-radius: 2px; }
+    .legend-name { overflow-wrap: anywhere; }
+    .percentage { margin-left: auto; white-space: nowrap; font-weight: 700; }
+    .detail-heading { display: flex; align-items: center; justify-content: space-between; padding: 16px; }
+    h2 { font-size: 1rem; margin: 0; }
+    .sort { border: 0; background: none; font-size: 0.85rem; padding: 8px; }
+    .detail-row { display: flex; align-items: center; gap: 12px; padding: 18px 16px; border-top: 1px solid #ddd; }
+    .detail-icon { font-size: 1.5rem; }
+    .detail-name { flex: 1; overflow-wrap: anywhere; }
+    .detail-amount { text-align: right; flex-shrink: 0; }
+    .detail-amount small { display: block; color: #666; margin-top: 4px; }
+    .bar-row { margin: 18px 0; }
+    .bar-label { display: flex; justify-content: space-between; gap: 12px; font-size: 0.9rem; margin-bottom: 6px; }
+    .bar-label span { overflow-wrap: anywhere; }
+    .bar-track { background: #f1f1f1; border-radius: 5px; height: 24px; overflow: hidden; }
+    .bar-fill { height: 100%; border: 1px solid #181818; border-radius: 5px; }
+    .message { color: #666; text-align: center; padding: 36px 12px; line-height: 1.7; }
+    .note { color: #666; font-size: 0.85rem; line-height: 1.6; }
+    [hidden] { display: none !important; }
+    @media (max-width: 380px) {
+      .legend { grid-template-columns: 1fr; }
+      .header-inner { gap: 8px; }
+      .tabs button { padding: 10px 4px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a class="back" href="/index.html">返回</a>
+      <div class="tabs" role="group" aria-label="統計類型">
+        <button type="button" data-mode="expense" aria-pressed="true">支出</button>
+        <button type="button" data-mode="income" aria-pressed="false">收入</button>
+        <button type="button" data-mode="balance" aria-pressed="false">結餘</button>
+      </div>
+    </div>
+  </header>
+  <main>
+    <h1>每月統計</h1>
+    <div class="month-row">
+      <button type="button" id="previous-month" aria-label="上個月">上一月</button>
+      <input type="month" id="month" aria-label="統計月份" min="0001-01" max="9998-12" required />
+      <button type="button" id="next-month" aria-label="下個月">下一月</button>
+    </div>
+    <p class="currency">金額單位：TWD</p>
+    <div class="chart-toolbar" role="group" aria-label="圖表類型">
+      <button type="button" data-chart="pie" aria-pressed="true">圓餅圖</button>
+      <button type="button" data-chart="bar" aria-pressed="false">長條圖</button>
+    </div>
+    <p class="message" id="status" role="status">載入中…</p>
+    <button class="retry" type="button" id="retry" hidden>重新載入</button>
+    <section id="results" hidden aria-label="統計結果">
+      <div class="total"><span id="total-label"></span><strong id="total-amount"></strong></div>
+      <div class="chart" id="chart" role="img"></div>
+      <p class="note" id="chart-note" hidden></p>
+      <div class="card legend" id="legend" aria-label="圖表圖例"></div>
+      <section class="card" aria-labelledby="details-title">
+        <div class="detail-heading">
+          <h2 id="details-title">分類明細</h2>
+          <button class="sort" id="sort" type="button">金額：由高到低</button>
+        </div>
+        <div id="details"></div>
+      </section>
+    </section>
+  </main>
+  <script>
+    const colors = ['#ef4070', '#ffbf16', '#f58c32', '#199bad', '#00bc94', '#8b68cf', '#4d82d9'];
+    const monthInput = document.getElementById('month');
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit',
+    }).formatToParts(new Date());
+    monthInput.value = parts.find(part => part.type === 'year').value + '-'
+      + parts.find(part => part.type === 'month').value;
+    let mode = 'expense';
+    let chartType = 'pie';
+    let monthlyRecords = [];
+    let descending = true;
+    let requestVersion = 0;
+    let loaded = false;
+    const money = cents => '$' + (cents / 100).toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+
+    function element(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function changeMonth(offset) {
+      if (!monthInput.validity.valid || !monthInput.value) return;
+      const [year, month] = monthInput.value.split('-').map(Number);
+      const index = year * 12 + month - 1 + offset;
+      if (index < 12 || index > 9998 * 12 + 11) return;
+      monthInput.value = String(Math.floor(index / 12)).padStart(4, '0') + '-'
+        + String(index % 12 + 1).padStart(2, '0');
+      loadMonth();
+    }
+
+    async function loadMonth() {
+      const version = ++requestVersion;
+      loaded = false;
+      document.getElementById('results').hidden = true;
+      const status = document.getElementById('status');
+      status.hidden = false;
+      document.getElementById('retry').hidden = true;
+      if (!monthInput.value || !monthInput.validity.valid) {
+        status.textContent = '請選擇有效月份';
+        return;
+      }
+      status.textContent = '載入中…';
+      try {
+        const data = await requestJSON('/api/records?month=' + encodeURIComponent(monthInput.value), {},
+          value => Array.isArray(value) && value.every(isRecord));
+        if (version !== requestVersion) return;
+        monthlyRecords = data;
+        loaded = true;
+        status.hidden = true;
+        document.getElementById('results').hidden = false;
+        render();
+      } catch (error) {
+        if (version !== requestVersion) return;
+        logError('載入每月統計失敗', error);
+        status.textContent = '統計載入失敗，請重新載入';
+        document.getElementById('retry').hidden = false;
+      }
+    }
+
+    function render() {
+      if (!loaded) return;
+      const groups = new Map();
+      let income = 0;
+      let expense = 0;
+      monthlyRecords.forEach(record => {
+        const cents = Math.round(record.amount * 100);
+        const isIncome = record.categoryId === 'income';
+        if (isIncome) income += cents;
+        else expense += cents;
+        if (mode === 'balance' || isIncome !== (mode === 'income')) return;
+        if (!groups.has(record.categoryId)) {
+          groups.set(record.categoryId, {
+            name: record.categoryName || '未命名分類', icon: record.categoryIcon || '', amount: 0,
+          });
+        }
+        groups.get(record.categoryId).amount += cents;
+      });
+      let rows = mode === 'balance'
+        ? [{ name: '收入', amount: income }, { name: '支出', amount: expense }]
+        : [...groups.values()];
+      rows.sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, 'zh-TW'));
+      rows = rows.map((row, index) => ({ ...row, color: colors[index % colors.length] }));
+      const total = mode === 'balance' ? income - expense : mode === 'income' ? income : expense;
+      const label = { expense: '支出總額', income: '收入總額', balance: '本月結餘' }[mode];
+      document.getElementById('total-label').textContent = label;
+      document.getElementById('total-amount').textContent = money(total);
+      document.getElementById('details-title').textContent = mode === 'balance' ? '收支明細' : '分類明細';
+      renderChart(rows, total, label);
+      renderDetails(rows);
+    }
+
+    function renderChart(rows, total, label) {
+      const chart = document.getElementById('chart');
+      const legend = document.getElementById('legend');
+      const note = document.getElementById('chart-note');
+      chart.replaceChildren();
+      legend.replaceChildren();
+      legend.hidden = rows.length === 0;
+      note.hidden = true;
+      const sum = rows.reduce((value, row) => value + row.amount, 0);
+      const negative = rows.some(row => row.amount < 0);
+      chart.setAttribute('aria-label', label + ' ' + money(total) + '；詳見下方明細');
+      if (!rows.length || rows.every(row => row.amount === 0)) {
+        chart.append(element('p', 'message', '本月尚無可繪製的金額'));
+      } else if (chartType === 'pie' && !negative) {
+        let angle = 0;
+        const stops = rows.map(row => {
+          const start = angle;
+          angle += row.amount / sum * 360;
+          return `${row.color} ${start}deg ${angle}deg`;
+        });
+        const ring = element('div', 'donut');
+        ring.style.background = 'conic-gradient(' + stops.join(',') + ')';
+        const center = element('div', 'donut-center');
+        center.append(element('span', '', label), element('strong', '', money(total)));
+        ring.append(center);
+        chart.append(ring);
+      } else {
+        const max = Math.max(...rows.map(row => Math.abs(row.amount)));
+        rows.forEach(row => {
+          const bar = element('div', 'bar-row');
+          const heading = element('div', 'bar-label');
+          heading.append(element('span', '', row.name), element('strong', '', money(row.amount)));
+          const track = element('div', 'bar-track');
+          const fill = element('div', 'bar-fill');
+          fill.style.width = Math.abs(row.amount) / max * 100 + '%';
+          fill.style.background = row.color;
+          track.append(fill);
+          bar.append(heading, track);
+          chart.append(bar);
+        });
+      }
+      if (negative) {
+        note.textContent = '含負數金額，使用長條圖呈現絕對值長度；實際正負金額請見標示。';
+        note.hidden = false;
+      } else if (mode === 'balance') {
+        note.textContent = '圖表比較收入與支出，結餘為收入減去支出。占比以收支金額合計計算。';
+        note.hidden = false;
+      }
+      rows.forEach(row => {
+        const item = element('div', 'legend-item');
+        const swatch = element('span', 'swatch');
+        swatch.style.background = row.color;
+        const percentage = sum > 0 && !negative ? (row.amount / sum * 100).toFixed(1) + '%' : '—';
+        item.append(swatch, element('span', 'legend-name', row.name), element('span', 'percentage', percentage));
+        legend.append(item);
+      });
+    }
+
+    function renderDetails(rows) {
+      const details = document.getElementById('details');
+      details.replaceChildren();
+      if (!rows.length) details.append(element('p', 'message', '本月尚無紀錄'));
+      const sorted = descending ? rows : [...rows].reverse();
+      sorted.forEach(row => {
+        const item = element('div', 'detail-row');
+        const marker = element('span', 'swatch');
+        marker.style.background = row.color;
+        item.append(marker, element('span', 'detail-icon', row.icon || ''), element('span', 'detail-name', row.name));
+        item.append(element('strong', 'detail-amount', money(row.amount)));
+        details.append(item);
+      });
+    }
+
+    document.getElementById('previous-month').addEventListener('click', () => changeMonth(-1));
+    document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
+    monthInput.addEventListener('change', loadMonth);
+    document.getElementById('retry').addEventListener('click', loadMonth);
+    document.querySelectorAll('[data-mode]').forEach(button => {
+      button.addEventListener('click', () => {
+        mode = button.dataset.mode;
+        document.querySelectorAll('[data-mode]').forEach(tab => {
+          tab.setAttribute('aria-pressed', String(tab === button));
+        });
+        render();
+      });
+    });
+    document.querySelectorAll('[data-chart]').forEach(button => {
+      button.addEventListener('click', () => {
+        chartType = button.dataset.chart;
+        document.querySelectorAll('[data-chart]').forEach(tab => {
+          tab.setAttribute('aria-pressed', String(tab === button));
+        });
+        render();
+      });
+    });
+    document.getElementById('sort').addEventListener('click', event => {
+      descending = !descending;
+      event.currentTarget.textContent = descending ? '金額：由高到低' : '金額：由低到高';
+      render();
+    });
+    loadMonth();
+  </script>
+</body>
+</html>

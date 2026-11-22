@@ -1,0 +1,11 @@
+# Local environment settings
+.env
+
+# Runtime database and backups
+/data/
+
+# Runtime logs
+/logs/
+
+# macOS metadata
+.DS_Store
