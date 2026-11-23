@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"net/url"
 	"strings"
 	"time"
 
@@ -11,7 +12,8 @@ import (
 )
 
 // 啟動台灣時間每天 20 點的提醒，回傳停止並等待排程結束的函式。
-func StartDailyMealReminder(db *sql.DB, client *Client) func() {
+// publicBaseURL 有設定時，提醒會附上「去記帳」按鈕開啟記帳頁。
+func StartDailyMealReminder(db *sql.DB, client *Client, publicBaseURL string) func() {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	location := time.FixedZone("Asia/Taipei", 8*60*60)
@@ -31,7 +33,7 @@ func StartDailyMealReminder(db *sql.DB, client *Client) func() {
 				timer.Stop()
 				return
 			case <-timer.C:
-				sendMealReminder(ctx, db, client, next.Format("2006-01-02"))
+				sendMealReminder(ctx, db, client, publicBaseURL, next.Format("2006-01-02"))
 			}
 		}
 	}()
@@ -43,7 +45,7 @@ func StartDailyMealReminder(db *sql.DB, client *Client) func() {
 }
 
 // 缺少任一餐時，將缺少的餐別私訊給每位白名單使用者。
-func sendMealReminder(ctx context.Context, db *sql.DB, client *Client, date string) {
+func sendMealReminder(ctx context.Context, db *sql.DB, client *Client, publicBaseURL, date string) {
 	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	missing, err := record.MissingMeals(queryCtx, db, date)
@@ -81,7 +83,7 @@ func sendMealReminder(ctx context.Context, db *sql.DB, client *Client, date stri
 	}
 	cancel()
 
-	message := NewText("今天（" + date + "）還沒記錄：" + strings.Join(missing, "、") + "，記得記帳。")
+	message := mealReminderMessage(publicBaseURL, date, missing)
 	sent := 0
 	for index, userID := range recipients {
 		if ctx.Err() != nil {
@@ -95,4 +97,17 @@ func sendMealReminder(ctx context.Context, db *sql.DB, client *Client, date stri
 	}
 	log.Printf("[meal-reminder] 提醒完成: date=%s missing=%s recipients=%d sent=%d",
 		date, strings.Join(missing, "、"), len(recipients), sent)
+}
+
+// 有公開網址時附上「去記帳」按鈕，開啟當天記帳頁並預選第一個缺少的餐別。
+func mealReminderMessage(publicBaseURL, date string, missing []string) Message {
+	text := "今天（" + date + "）還沒記錄：" + strings.Join(missing, "、") + "，記得記帳。"
+	base := strings.TrimRight(strings.TrimSpace(publicBaseURL), "/")
+	if base == "" {
+		return NewText(text)
+	}
+	query := url.Values{}
+	query.Set("date", date)
+	query.Set("meal", missing[0])
+	return NewLinkButton(text, "去記帳", base+"/spendInput.html?"+query.Encode())
 }

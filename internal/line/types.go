@@ -42,15 +42,44 @@ type EventMessage struct {
 	Text *string `json:"text,omitempty"`
 }
 
-// Message 是機器人要送的訊息
+// Message 是機器人要送的訊息（text 或 template）
 type Message struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type     string    `json:"type"`
+	Text     string    `json:"text,omitempty"`
+	AltText  string    `json:"altText,omitempty"`
+	Template *Template `json:"template,omitempty"`
+}
+
+// Template 是 buttons 樣板內容
+type Template struct {
+	Type    string   `json:"type"`
+	Text    string   `json:"text"`
+	Actions []Action `json:"actions"`
+}
+
+// Action 是樣板上的按鈕
+type Action struct {
+	Type  string `json:"type"`
+	Label string `json:"label"`
+	URI   string `json:"uri,omitempty"`
 }
 
 // NewText 建立文字訊息
 func NewText(text string) Message {
 	return Message{Type: "text", Text: text}
+}
+
+// NewLinkButton 建立帶一個連結按鈕的訊息；text 上限 160 字，label 上限 20 字。
+func NewLinkButton(text, label, uri string) Message {
+	return Message{
+		Type:    "template",
+		AltText: text,
+		Template: &Template{
+			Type:    "buttons",
+			Text:    text,
+			Actions: []Action{{Type: "uri", Label: label, URI: uri}},
+		},
+	}
 }
 
 // Follow 是關注事件
