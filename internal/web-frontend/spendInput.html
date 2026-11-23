@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>記帳工具</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -10,95 +10,199 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f5f5f5;
       height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
+    button, input { font: inherit; }
+    [hidden] { display: none !important; }
 
-    /* ===== 上半部：紀錄列表 + 日期 ===== */
-    .top-section {
+    /* ===== 日期列 ===== */
+    .date-picker {
       display: flex;
+      align-items: center;
+      background: #f5f5f5;
+      border-bottom: 1px solid #eee;
+      flex-shrink: 0;
+      height: 60px;
+      padding: 0 8px;
+      gap: 6px;
+    }
+    .dp-arrow {
+      width: 48px;
+      height: 48px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      border: none;
+      border-radius: 50%;
+      background: #e3e3e3;
+      color: #333;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .dp-arrow:active { background: #d2d2d2; }
+    .dp-center {
       flex: 1;
-      min-height: 0;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .dp-date-btn {
+      border: none;
+      background: none;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #222;
+      padding: 8px 4px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .dp-date-btn::after { content: ' ▾'; color: #888; font-size: 0.8rem; }
+
+    /* ===== 月曆 ===== */
+    .calendar-pop { width: min(320px, calc(100% - 32px)); padding: 12px; }
+    .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .cal-head strong { font-size: 1rem; }
+    .cal-nav {
+      width: 40px; height: 40px;
+      border: none; border-radius: 50%;
+      background: #f0f0f0; font-size: 1rem; cursor: pointer;
+    }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-week { font-size: 0.75rem; color: #999; padding: 4px 0; }
+    .cal-day {
+      aspect-ratio: 1;
+      border: none;
+      border-radius: 50%;
+      background: none;
+      font-size: 0.95rem;
+      color: #222;
+      cursor: pointer;
+    }
+    .cal-day:active { background: #eee; }
+    .cal-day.today { box-shadow: inset 0 0 0 1px #2e9e5b; color: #2e9e5b; font-weight: 700; }
+    .cal-day.selected { background: #2e9e5b; color: #fff; font-weight: 700; }
+    .cal-foot { display: flex; justify-content: space-between; margin-top: 10px; }
+    .cal-foot button { border: none; background: none; font-size: 0.9rem; padding: 8px 12px; cursor: pointer; }
+    .cal-foot .cal-today { color: #2e9e5b; font-weight: 700; }
+    .cal-foot .cal-close { color: #999; }
+    .dp-today {
+      flex-shrink: 0;
+      border: 1px solid #2e9e5b;
+      background: #fff;
+      color: #2e9e5b;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 16px;
+      cursor: pointer;
+    }
+
+    /* ===== 當日總額 ===== */
+    .day-summary {
+      display: flex;
+      flex-shrink: 0;
       background: #fff;
       border-bottom: 1px solid #eee;
     }
+    .day-summary div { flex: 1; padding: 8px 12px; }
+    .day-summary div + div { border-left: 1px solid #eee; }
+    .day-summary span { display: block; font-size: 0.75rem; color: #888; }
+    .day-summary strong { font-size: 1.05rem; }
+    .sum-expense strong { color: #d64535; }
+    .sum-income strong { color: #2e9e5b; }
 
+    /* ===== 紀錄列表 ===== */
     .records-list {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
-      padding: 8px 12px;
+      padding: 4px 12px;
+      background: #fff;
     }
     .record-item {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 0;
+      padding: 10px 4px;
       border-bottom: 1px solid #f0f0f0;
       cursor: pointer;
     }
-    .record-item .r-icon { font-size: 1.4rem; }
-    .record-item .r-info { flex: 1; }
-    .record-item .r-name { font-size: 0.9rem; font-weight: 600; color: #222; }
-    .record-item .r-note { font-size: 0.75rem; color: #999; display: flex; align-items: center; gap: 4px; }
+    .record-item.editing {
+      background: #fff3e2;
+      border-radius: 8px;
+      box-shadow: inset 3px 0 0 #f09030;
+    }
+    .r-icon { font-size: 1.4rem; }
+    .r-info { flex: 1; min-width: 0; }
+    .r-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .r-name { font-size: 0.9rem; font-weight: 600; color: #222; }
+    .r-who {
+      font-size: 0.7rem;
+      color: #555;
+      background: #eef0f3;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .r-note { font-size: 0.78rem; color: #888; margin-top: 2px; overflow-wrap: anywhere; }
     .r-tag {
       display: inline-block;
-      background: #4a90d9;
-      color: #fff;
+      border: 1px solid #b8c7d9;
+      color: #5a6f87;
       font-size: 0.65rem;
-      font-weight: 600;
-      padding: 2px 8px;
+      padding: 0 6px;
       border-radius: 10px;
-      line-height: 1.4;
+      line-height: 1.5;
     }
-    .record-item .r-amount { font-size: 1rem; font-weight: 700; color: #2e9e5b; }
+    .r-amount { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+    .r-amount.expense { color: #d64535; }
+    .r-amount.income { color: #2e9e5b; }
     .empty-hint {
       text-align: center;
-      color: #ccc;
+      color: #bbb;
       font-size: 0.85rem;
       padding: 24px 0;
     }
 
-    .date-picker {
+    /* ===== 編輯狀態 ===== */
+    .edit-banner {
       display: flex;
       align-items: center;
-      justify-content: center;
-      background: #f5f5f5;
-      border-bottom: 1px solid #eee;
+      gap: 8px;
       flex-shrink: 0;
-      height: 48px;
-      padding: 0 16px;
-      gap: 12px;
-    }
-    .dp-arrow {
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-      cursor: pointer;
-      border-radius: 50%;
-      background: #e8e8e8;
-      color: #333;
-      user-select: none;
-    }
-    .dp-arrow:active { background: #ddd; }
-    .dp-date-text {
+      background: #f09030;
+      color: #fff;
+      padding: 8px 12px;
       font-size: 0.9rem;
-      font-weight: 600;
-      color: #222;
-      white-space: nowrap;
     }
+    .edit-banner p { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .edit-banner button {
+      border: 1px solid #fff;
+      background: transparent;
+      color: #fff;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .edit-banner button.del { background: #fff; color: #d64535; border-color: #fff; }
+    .edit-banner button:disabled { opacity: 0.6; cursor: wait; }
 
     /* ===== 下半部：輸入 ===== */
     .bottom-section {
       display: flex;
-      height: 40vh;
-      min-height: 0;
-      box-shadow: 4px 0 8px rgba(0,0,0,0.16), 8px 0 16px rgba(0,0,0,0.23);
+      height: 38vh;
+      height: 40dvh;
+      min-height: 270px;
+      flex-shrink: 0;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.12);
     }
-
     .category-panel {
       flex: none;
       width: 40%;
@@ -111,63 +215,74 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 14px 16px;
+      padding: 12px 14px;
       cursor: pointer;
       border: 2px solid transparent;
-      transition: background 0.15s;
     }
     .cat-item:active { background: #f9f9f9; }
-    .cat-item.selected {
-      border-color: #1b7f43;
-      background: #d9f2e3;
-    }
-    .cat-item .c-icon { font-size: 1.4rem; }
-    .cat-item .c-name { font-size: 0.95rem; font-weight: 600; color: #222; }
-
+    .cat-item.selected { border-color: #1b7f43; background: #d9f2e3; }
+    .c-icon { font-size: 1.3rem; }
+    .c-name { font-size: 0.9rem; font-weight: 600; color: #222; overflow-wrap: anywhere; }
     .cat-add-btn {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 14px 16px;
+      padding: 12px 14px;
       cursor: pointer;
       color: #2e9e5b;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 600;
       border-top: 1px dashed #ddd;
     }
-    .cat-add-btn:active { background: #f9f9f9; }
 
-    /* 右半邊 */
     .input-panel {
       flex: 1;
       min-width: 0;
       background: #fff;
       display: flex;
       flex-direction: column;
+      gap: 8px;
       padding: 8px;
     }
-
-
-
-    .number-input {
-      flex-shrink: 0;
-      min-width: 0;
-      max-width: 100%;
+    .field {
+      display: flex;
+      align-items: center;
       border: 1px solid #bbb;
       border-radius: 8px;
-      padding: 8px 10px;
-      margin-bottom: 8px;
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #222;
+      padding: 0 10px;
+      flex-shrink: 0;
+    }
+    .field:focus-within { border-color: #2e9e5b; box-shadow: 0 0 0 1px #2e9e5b; }
+    .field label {
+      flex-shrink: 0;
+      font-size: 0.8rem;
+      color: #777;
+      width: 2.6em;
+    }
+    .field input {
+      flex: 1;
+      min-width: 0;
+      border: none;
       outline: none;
       background: transparent;
-      text-align: right;
+      padding: 9px 0;
+      color: #222;
     }
-    .number-input:focus {
-      border-color: #2e9e5b;
-      box-shadow: 0 0 0 1px #2e9e5b;
+    .amount-input { text-align: right; font-size: 1.15rem; font-weight: 700; }
+    .note-input { text-align: left; font-size: 0.95rem; font-weight: 400; }
+
+    .tag-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex-shrink: 0; }
+    .tag-btn {
+      border: 1px solid #ddd;
+      background: #fff;
+      color: #666;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 6px;
+      border-radius: 8px;
+      cursor: pointer;
     }
+    .tag-btn.active { border-color: #4a7bb7; background: #eef4fb; color: #2f5f99; }
     .ok-btn {
       flex-shrink: 0;
       margin-top: auto;
@@ -175,36 +290,39 @@
       background: #f09030;
       color: #fff;
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       padding: 12px 20px;
       border-radius: 10px;
       cursor: pointer;
       touch-action: manipulation;
     }
     .ok-btn:active { background: #d07820; }
+    .ok-btn.update { background: #2e6be6; }
+    .ok-btn:disabled { opacity: 0.6; cursor: wait; }
 
-    .tag-row { display: flex; gap: 8px; margin-bottom: 8px; }
-    .tag-btn {
-      flex: 1;
-      border: 1px solid #ddd;
+    /* ===== 底部導覽 ===== */
+    .bottom-nav {
+      display: flex;
+      flex-shrink: 0;
       background: #fff;
-      color: #666;
+      border-top: 1px solid #ddd;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .bottom-nav a {
+      flex: 1;
+      text-align: center;
+      padding: 12px 0;
+      color: #777;
+      text-decoration: none;
       font-size: 0.9rem;
-      font-weight: 600;
-      padding: 8px;
-      border-radius: 8px;
-      cursor: pointer;
+      font-weight: 700;
     }
-    .tag-btn.active {
-      border-color: #2e9e5b;
-      background: #f6fdf9;
-      color: #2e9e5b;
-    }
+    .bottom-nav a[aria-current="page"] { color: #1b7f43; box-shadow: inset 0 3px 0 #1b7f43; }
 
-    /* 成功提示 */
+    /* ===== 提示與彈窗 ===== */
     .toast {
       position: fixed;
-      bottom: 100px;
+      bottom: 120px;
       left: 50%;
       transform: translateX(-50%);
       background: #2e9e5b;
@@ -218,8 +336,6 @@
       z-index: 99;
     }
     .toast.show { opacity: 1; }
-
-    /* 紀錄操作彈窗（編輯 / 刪除） */
     .action-overlay {
       position: fixed;
       inset: 0;
@@ -234,7 +350,7 @@
       background: #fff;
       border-radius: 14px;
       padding: 16px;
-      width: 220px;
+      width: 240px;
       text-align: center;
     }
     .ap-title { font-size: 0.9rem; font-weight: 600; color: #222; margin-bottom: 14px; }
@@ -248,17 +364,16 @@
       font-weight: 600;
       cursor: pointer;
     }
-    .ap-btn.edit { background: #e8f0fe; color: #2e6be6; }
-    .ap-btn.del { background: #fdecec; color: #e0453a; }
-    .ap-cancel { margin-top: 12px; border: none; background: none; color: #999; font-size: 0.85rem; cursor: pointer; }
-
-    .category-pop {
-      width: min(340px, calc(100% - 32px));
-      max-height: calc(100dvh - 32px);
-      overflow-y: auto;
+    .category-pop { width: min(340px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+    .category-label { display: block; text-align: left; margin-bottom: 6px; font-size: 0.9rem; }
+    .category-input {
+      width: 100%;
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      font-size: 1rem;
     }
-    .category-label { display: block; text-align: left; margin-bottom: 8px; font-size: 0.9rem; }
-    .category-name-input { width: 100%; text-align: left; font-weight: 400; }
     .category-submit { background: #2e9e5b; color: #fff; }
     .category-submit:disabled { opacity: 0.6; cursor: wait; }
   </style>
@@ -280,39 +395,68 @@
 <body>
 
   <!-- 日期列 -->
-  <div class="date-picker" id="date-picker"></div>
-
-  <!-- 上半部 -->
-  <div class="top-section">
-    <div class="records-list" id="records-list">
-      <div class="empty-hint">尚無紀錄</div>
+  <div class="date-picker">
+    <button class="dp-arrow" type="button" onclick="shiftDay(-1)" aria-label="前一天">◀</button>
+    <div class="dp-center">
+      <button class="dp-date-btn" type="button" id="dp-date-text" onclick="openCalendar()"
+        aria-haspopup="dialog" aria-label="選擇日期"></button>
+      <button class="dp-today" type="button" id="dp-today" onclick="goToday()">今天</button>
     </div>
+    <button class="dp-arrow" type="button" onclick="shiftDay(1)" aria-label="後一天">▶</button>
+  </div>
+
+  <!-- 當日總額 -->
+  <div class="day-summary">
+    <div class="sum-expense"><span>今日支出</span><strong id="sum-expense">$0</strong></div>
+    <div class="sum-income"><span>今日收入</span><strong id="sum-income">$0</strong></div>
+  </div>
+
+  <div class="records-list" id="records-list">
+    <div class="empty-hint">尚無紀錄</div>
+  </div>
+
+  <!-- 編輯中提示 -->
+  <div class="edit-banner" id="edit-banner" hidden>
+    <p id="edit-banner-text">正在修改</p>
+    <button type="button" class="del" id="delete-btn" onclick="deleteEditing()">刪除</button>
+    <button type="button" onclick="cancelEdit()">取消</button>
   </div>
 
   <!-- 下半部 -->
   <div class="bottom-section">
     <div class="category-panel" id="category-panel"></div>
     <div class="input-panel">
-      <input class="number-input" id="number-input" inputmode="decimal" placeholder="金額" value="0" />
-      <input class="number-input" id="note-input" placeholder="備註" />
-      <div class="tag-row">
-        <button class="tag-btn" onclick="selectTag('尼')">尼</button>
-        <button class="tag-btn" onclick="selectTag('拿')">拿</button>
-        <button class="tag-btn" onclick="selectTag('\u{1F3E0}')" aria-label="房屋">&#x1F3E0;</button>
+      <div class="field">
+        <label for="number-input">金額</label>
+        <input class="amount-input" id="number-input" inputmode="decimal" placeholder="0" value="0" />
       </div>
-      <button class="ok-btn" onclick="pressOK()">確認</button>
+      <div class="field">
+        <label for="note-input">備註</label>
+        <input class="note-input" id="note-input" placeholder="選填" />
+      </div>
+      <div class="tag-row" id="tag-row" role="group" aria-label="標記（可複選）"></div>
+      <button class="ok-btn" type="button" id="ok-btn" onclick="pressOK()">確認</button>
     </div>
   </div>
 
-  <!-- 紀錄操作彈窗 -->
-  <div class="action-overlay" id="action-overlay">
-    <div class="action-pop">
-      <div class="ap-title" id="ap-title"></div>
-      <div class="ap-btns">
-        <button class="ap-btn edit" onclick="editRecord()">編輯</button>
-        <button class="ap-btn del" onclick="deleteRecord()">刪除</button>
+  <nav class="bottom-nav" aria-label="頁面切換">
+    <a href="/spendInput.html" aria-current="page">記帳</a>
+    <a href="/statistics.html">統計</a>
+  </nav>
+
+  <!-- 月曆 -->
+  <div class="action-overlay" id="calendar-overlay" onclick="if (event.target === this) closeCalendar()">
+    <div class="action-pop calendar-pop" role="dialog" aria-modal="true" aria-labelledby="cal-title">
+      <div class="cal-head">
+        <button class="cal-nav" type="button" onclick="shiftCalendarMonth(-1)" aria-label="上個月">◀</button>
+        <strong id="cal-title"></strong>
+        <button class="cal-nav" type="button" onclick="shiftCalendarMonth(1)" aria-label="下個月">▶</button>
       </div>
-      <button class="ap-cancel" onclick="hideActions()">取消</button>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-foot">
+        <button class="cal-today" type="button" onclick="closeCalendar(); goToday()">今天</button>
+        <button class="cal-close" type="button" onclick="closeCalendar()">關閉</button>
+      </div>
     </div>
   </div>
 
@@ -323,11 +467,9 @@
         aria-labelledby="category-title" onsubmit="submitCategory(event)">
       <div class="ap-title" id="category-title">新增分類</div>
       <label class="category-label" for="category-name">分類名稱</label>
-      <input class="number-input category-name-input" id="category-name"
-        placeholder="輸入分類名稱" required />
+      <input class="category-input" id="category-name" placeholder="輸入分類名稱" required />
       <label class="category-label" for="category-icon">分類圖示</label>
-      <input class="number-input category-name-input" id="category-icon"
-        placeholder="輸入或貼上 emoji" required />
+      <input class="category-input" id="category-icon" placeholder="輸入或貼上 emoji" required />
       <div class="ap-btns">
         <button class="ap-btn" type="button" onclick="hideCategoryForm()">取消</button>
         <button class="ap-btn category-submit" id="category-submit" type="submit">新增</button>
@@ -340,9 +482,74 @@
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
 
-    // ---- categories ----
-    let CATEGORIES = [];
+    // 標記可複選，存成依此順序、以逗號分隔的字串（例如「尼,午餐」）。
+    const TAGS = [
+      { value: '尼', label: '尼' },
+      { value: '拿', label: '拿' },
+      { value: '\u{1F3E0}', label: '\u{1F3E0}', aria: '房屋' },
+      { value: '早餐', label: '早餐' },
+      { value: '午餐', label: '午餐' },
+      { value: '晚餐', label: '晚餐' },
+    ];
 
+    // ---- state ----
+    let CATEGORIES = [];
+    let selectedCat = null;
+    let selectedTags = new Set();
+    let editingRecord = null;
+    let saving = false;
+    let deleting = false;
+    let savingCategory = false;
+    let recentCategoryIds = [];
+    let recentCategoryStorageKey = null;
+    let currentDate = new Date();
+    let calendarMonth = new Date();
+    let records = [];
+    let loadVersion = 0;
+
+    // 三餐提醒連結：?date=YYYY-MM-DD&meal=午餐，開啟該日並預選對應的餐別標記。
+    const params = new URLSearchParams(window.location.search);
+    const linkedDate = parseDate(params.get('date'));
+    if (linkedDate) currentDate = linkedDate;
+    const linkedMeal = params.get('meal');
+    if (TAGS.some(t => t.value === linkedMeal)) selectedTags.add(linkedMeal);
+
+    // ---- init ----
+    const amountInput = document.getElementById('number-input');
+    amountInput.addEventListener('focus', () => {
+      if (amountInput.value === '0') amountInput.value = '';
+    });
+    amountInput.addEventListener('blur', () => {
+      if (!amountInput.value.trim()) amountInput.value = '0';
+    });
+    document.getElementById('tag-row').innerHTML = TAGS.map(t => `
+      <button class="tag-btn" type="button" data-tag="${t.value}" aria-pressed="false"
+        ${t.aria ? `aria-label="${t.aria}"` : ''} onclick="toggleTag(this.dataset.tag)">${t.label}</button>
+    `).join('');
+    renderTags();
+    try {
+      const userId = localStorage.getItem('lineUserId');
+      if (userId) {
+        recentCategoryStorageKey = 'recentCategories:' + userId;
+        const stored = localStorage.getItem(recentCategoryStorageKey);
+        if (stored !== null) {
+          const ids = JSON.parse(stored);
+          if (Array.isArray(ids) && ids.every(id => typeof id === 'string')) {
+            recentCategoryIds = [...new Set(ids)];
+          }
+        } else {
+          const previousId = localStorage.getItem('recentCategory:' + userId);
+          if (previousId) recentCategoryIds = [previousId];
+        }
+      }
+    } catch (error) {
+      logError('讀取最近使用分類失敗', error);
+    }
+    fetchCategories();
+    renderDatePicker();
+    loadRecords();
+
+    // ---- categories ----
     async function fetchCategories() {
       try {
         CATEGORIES = await requestJSON('/api/spend-categories', {},
@@ -377,49 +584,6 @@
       }
     }
 
-    // ---- state ----
-    let selectedCat = null;
-    let selectedTag = null;
-    let selectedRecord = null;
-    let editingId = null;
-    let savingCategory = false;
-    let recentCategoryIds = [];
-    let recentCategoryStorageKey = null;
-
-    let currentDate = new Date();
-    let records = [];
-
-    // ---- init ----
-    const amountInput = document.getElementById('number-input');
-    amountInput.addEventListener('focus', () => {
-      if (amountInput.value === '0') amountInput.value = '';
-    });
-    amountInput.addEventListener('blur', () => {
-      if (!amountInput.value.trim()) amountInput.value = '0';
-    });
-    try {
-      const userId = localStorage.getItem('lineUserId');
-      if (userId) {
-        recentCategoryStorageKey = 'recentCategories:' + userId;
-        const stored = localStorage.getItem(recentCategoryStorageKey);
-        if (stored !== null) {
-          const ids = JSON.parse(stored);
-          if (Array.isArray(ids) && ids.every(id => typeof id === 'string')) {
-            recentCategoryIds = [...new Set(ids)];
-          }
-        } else {
-          const previousId = localStorage.getItem('recentCategory:' + userId);
-          if (previousId) recentCategoryIds = [previousId];
-        }
-      }
-    } catch (error) {
-      logError('讀取最近使用分類失敗', error);
-    }
-    fetchCategories();
-    renderDatePicker();
-    renderDisplay();
-    loadRecords();
-
     // ---- render ----
     function renderCategories() {
       const categoriesById = new Map(CATEGORIES.map(category => [category.id, category]));
@@ -430,9 +594,9 @@
       ];
       const items = orderedCategories.map(c => `
         <div class="cat-item ${selectedCat?.id === c.id ? 'selected' : ''}"
-            onclick="selectCategory('${c.id}')">
+            data-id="${escapeHTML(c.id)}" onclick="selectCategory(this.dataset.id)">
           <span class="c-icon">${escapeHTML(c.icon)}</span>
-          <span class="c-name">${c.name}</span>
+          <span class="c-name">${escapeHTML(c.name)}</span>
         </div>
       `).join('');
       document.getElementById('category-panel').innerHTML = items + `
@@ -441,6 +605,87 @@
           <span>新增分類</span>
         </div>
       `;
+      const selected = document.querySelector('.cat-item.selected');
+      if (selected) selected.scrollIntoView({ block: 'nearest' });
+    }
+
+    function renderDatePicker() {
+      const isToday = currentDate.toDateString() === new Date().toDateString();
+      const weekNames = ['日','一','二','三','四','五','六'];
+      const [y, m, d] = formatDate(currentDate).split('-');
+      document.getElementById('dp-date-text').textContent =
+        `${isToday ? '今日 ' : ''}${y}/${m}/${d} 星期${weekNames[currentDate.getDay()]}`;
+      document.getElementById('dp-today').hidden = isToday;
+    }
+
+    function renderRecords() {
+      const list = document.getElementById('records-list');
+      let expense = 0;
+      let income = 0;
+      records.forEach(r => {
+        const cents = Math.round(r.amount * 100);
+        if (recordIsIncome(r)) income += cents; else expense += cents;
+      });
+      document.getElementById('sum-expense').textContent = money(expense);
+      document.getElementById('sum-income').textContent = money(income);
+
+      if (records.length === 0) {
+        list.innerHTML = '<div class="empty-hint">尚無紀錄</div>';
+        return;
+      }
+      list.innerHTML = records.map(r => {
+        const isIncome = recordIsIncome(r);
+        const who = r.recorderName || '未知記帳者';
+        return `
+          <div class="record-item ${editingRecord?.id === r.id ? 'editing' : ''}"
+              onclick="editRecord(${r.id})">
+            <span class="r-icon">${escapeHTML(r.categoryIcon || '\u{1F4E6}')}</span>
+            <div class="r-info">
+              <div class="r-top">
+                <span class="r-name">${escapeHTML(r.categoryName || '未命名分類')}</span>
+                <span class="r-who">${escapeHTML(who)} 記</span>
+                ${splitTags(r.tag).map(t => `<span class="r-tag">${escapeHTML(t)}</span>`).join('')}
+              </div>
+              ${r.note ? `<div class="r-note">${escapeHTML(r.note)}</div>` : ''}
+            </div>
+            <span class="r-amount ${isIncome ? 'income' : 'expense'}">
+              ${isIncome ? '+' : '−'}${money(Math.round(r.amount * 100))}
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderEditState() {
+      const banner = document.getElementById('edit-banner');
+      const button = document.getElementById('ok-btn');
+      banner.hidden = !editingRecord;
+      if (editingRecord) {
+        document.getElementById('edit-banner-text').textContent =
+          `正在修改：${editingRecord.categoryName || ''} ${money(Math.round(editingRecord.amount * 100))}`;
+      }
+      if (!saving) button.textContent = editingRecord ? '更新' : '確認';
+      button.classList.toggle('update', !!editingRecord);
+    }
+
+    function renderTags() {
+      document.querySelectorAll('.tag-btn[data-tag]').forEach(btn => {
+        const active = selectedTags.has(btn.dataset.tag);
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      });
+    }
+
+    // ---- actions ----
+    function toggleTag(tag) {
+      if (selectedTags.has(tag)) selectedTags.delete(tag); else selectedTags.add(tag);
+      renderTags();
+    }
+
+    function selectCategory(id) {
+      const cat = CATEGORIES.find(c => c.id === id);
+      selectedCat = selectedCat?.id === id ? null : cat;
+      renderCategories();
     }
 
     function onAddCategory() {
@@ -484,153 +729,119 @@
       }
     }
 
-    function renderDatePicker() {
-      const today = new Date();
-      const isToday = currentDate.toDateString() === today.toDateString();
-      const y = currentDate.getFullYear();
-      const m = String(currentDate.getMonth() + 1).padStart(2, '0');
-      const d = String(currentDate.getDate()).padStart(2, '0');
-      const weekNames = ['日','一','二','三','四','五','六'];
-      const week = '星期' + weekNames[currentDate.getDay()];
-      const prefix = isToday ? '今日 ' : '';
-      const text = `${prefix}${y}/${m}/${d} ${week}`;
-
-      document.getElementById('date-picker').innerHTML = `
-        <div class="dp-arrow" onclick="prevDay()">◀</div>
-        <div class="dp-date-text">${text}</div>
-        <div class="dp-arrow" onclick="nextDay()">▶</div>
-      `;
+    async function deleteEditing() {
+      if (!editingRecord || saving || deleting) return;
+      if (!confirm('確定刪除這筆紀錄？')) return;
+      const id = editingRecord.id;
+      const button = document.getElementById('delete-btn');
+      deleting = true;
+      button.disabled = true;
+      button.textContent = '刪除中…';
+      try {
+        await requestJSON('/api/records/' + id, { method: 'DELETE' });
+        records = records.filter(r => r.id !== id);
+        resetForm();
+        selectedCat = null;
+        renderCategories();
+        renderRecords();
+        showToast('已刪除');
+      } catch (error) {
+        logError('刪除紀錄失敗', error);
+        showToast('刪除失敗: ' + error.message);
+      } finally {
+        deleting = false;
+        button.disabled = false;
+        button.textContent = '刪除';
+      }
     }
 
-    function renderDisplay() {}
-
-    function selectTag(tag) {
-      selectedTag = selectedTag === tag ? null : tag;
-      document.querySelectorAll('.tag-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent === selectedTag);
-      });
-    }
-
-    function renderRecords() {
-      const list = document.getElementById('records-list');
-      if (records.length === 0) {
-        list.innerHTML = '<div class="empty-hint">尚無紀錄</div>';
+    // 點一筆紀錄就直接進入修改狀態；再點同一筆則取消。
+    function editRecord(id) {
+      if (saving || deleting) return;
+      if (editingRecord?.id === id) {
+        cancelEdit();
         return;
       }
-      list.innerHTML = records.map(r => `
-        <div class="record-item" onclick="showRecordActions(${r.id})">
-          <span class="r-icon">${escapeHTML(r.categoryIcon || '\u{1F4E6}')}</span>
-          <div class="r-info">
-            <div class="r-name">${r.categoryName}</div>
-            ${r.note || r.tag
-              ? `<div class="r-note">${r.note ? r.note : ''}${r.tag
-                ? ` <span class="r-tag">${r.tag}</span>` : ''}</div>` : ''}
-          </div>
-          <span class="r-amount">$${r.amount}</span>
-        </div>
-      `).join('');
-    }
-
-    // ---- actions ----
-    function selectCategory(id) {
-      const cat = CATEGORIES.find(c => c.id === id);
-      selectedCat = selectedCat?.id === id ? null : cat;
-      renderCategories();
-      renderDisplay();
-    }
-
-    // ---- 紀錄操作（編輯 / 刪除） ----
-    function showRecordActions(id) {
       const rec = records.find(r => r.id === id);
       if (!rec) return;
-      selectedRecord = rec;
-      document.getElementById('ap-title').textContent = `$${rec.amount} ${rec.categoryName}`;
-      document.getElementById('action-overlay').classList.add('show');
-    }
-
-    function hideActions() {
-      document.getElementById('action-overlay').classList.remove('show');
-      selectedRecord = null;
-    }
-
-    function deleteRecord() {
-      if (!selectedRecord) return;
-      const id = selectedRecord.id;
-      hideActions();
-      if (!confirm('確定刪除這筆紀錄？')) return;
-      requestJSON('/api/records/' + id, { method: 'DELETE' })
-        .then(() => { loadRecords(); showToast('已刪除'); })
-        .catch(error => {
-          logError('刪除紀錄失敗', error);
-          showToast('刪除失敗: ' + error.message);
-        });
-    }
-
-    function editRecord() {
-      if (!selectedRecord) return;
-      const rec = selectedRecord;
-      hideActions();
-      editingId = rec.id;
+      editingRecord = rec;
       selectedCat = CATEGORIES.find(c => c.id === rec.categoryId)
         || { id: rec.categoryId, name: rec.categoryName, icon: rec.categoryIcon };
-      const d = rec.date.split('-').map(Number);
-      currentDate = new Date(d[0], d[1] - 1, d[2]);
       document.getElementById('number-input').value = rec.amount;
       document.getElementById('note-input').value = rec.note || '';
-      selectedTag = rec.tag || null;
-      document.querySelectorAll('.tag-row .tag-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent === selectedTag);
-      });
+      selectedTags = new Set(splitTags(rec.tag));
+      renderTags();
       renderCategories();
-      renderDisplay();
-      renderDatePicker();
-      loadRecords();
+      renderEditState();
+      const d = parseDate(rec.date);
+      if (d && formatDate(d) !== formatDate(currentDate)) {
+        currentDate = d;
+        renderDatePicker();
+        loadRecords();
+      } else {
+        renderRecords();
+      }
+    }
+
+    function cancelEdit() {
+      if (saving || deleting) return;
+      resetForm();
+      selectedCat = null;
+      renderCategories();
+      renderRecords();
+    }
+
+    // 清空輸入並離開編輯狀態；分類保留，方便連續記同一類。
+    function resetForm() {
+      editingRecord = null;
+      document.getElementById('number-input').value = '0';
+      document.getElementById('note-input').value = '';
+      selectedTags = new Set();
+      renderTags();
+      renderEditState();
     }
 
     async function pressOK() {
+      if (saving) return;
       if (!selectedCat) {
         showToast('請先選分類');
         return;
       }
       const note = document.getElementById('note-input').value.trim();
       const amount = parseFloat(document.getElementById('number-input').value) || 0;
-
+      const isEdit = editingRecord !== null;
       const payload = {
-        categoryId:   selectedCat.id,
-        categoryName: selectedCat.name,
-        categoryIcon: selectedCat.icon,
+        categoryId: selectedCat.id,
         note,
-        tag: selectedTag || '',
+        tag: joinTags(selectedTags),
         amount,
+        // 編輯時切換日期即可把紀錄移到該日，與原本行為相同。
         date: formatDate(currentDate),
       };
-
-      const isEdit = editingId !== null;
-      const url = isEdit ? '/api/records/' + editingId : '/api/records';
-      const method = isEdit ? 'PUT' : 'POST';
-
-      try {
-        if (!isEdit) {
-          const lineUserId = localStorage.getItem('lineUserId');
-          if (!lineUserId || !lineUserId.trim()) {
-            showToast('缺少登入資訊，請重新登入');
-            return;
-          }
-          payload.lineUserId = lineUserId.trim();
+      if (!isEdit) {
+        let lineUserId = null;
+        try { lineUserId = localStorage.getItem('lineUserId'); } catch {}
+        if (!lineUserId || !lineUserId.trim()) {
+          showToast('缺少登入資訊，請重新登入');
+          return;
         }
-        const saved = await requestJSON(url, {
-          method,
+        payload.lineUserId = lineUserId.trim();
+      }
+
+      const button = document.getElementById('ok-btn');
+      saving = true;
+      button.disabled = true;
+      button.textContent = isEdit ? '更新中…' : '存入中…';
+      try {
+        const saved = await requestJSON(isEdit ? '/api/records/' + editingRecord.id : '/api/records', {
+          method: isEdit ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         }, isRecord);
-        if (isEdit) {
+        if (saved.date === formatDate(currentDate)) {
           const idx = records.findIndex(r => r.id === saved.id);
-          if (idx !== -1) records[idx] = saved;
-        } else {
-          records.unshift(saved);
+          if (idx !== -1) records[idx] = saved; else records.unshift(saved);
         }
-        editingId = null;
-        renderRecords();
         recentCategoryIds = [saved.categoryId, ...recentCategoryIds.filter(id => id !== saved.categoryId)];
         try {
           if (recentCategoryStorageKey) {
@@ -639,37 +850,99 @@
         } catch (error) {
           logError('保存最近使用分類失敗', error);
         }
+        saving = false;
+        resetForm();
+        renderRecords();
         renderCategories();
         document.getElementById('category-panel').scrollTop = 0;
-        document.getElementById('number-input').value = '0';
-        document.getElementById('note-input').value = '';
-        selectedTag = null;
-        document.querySelectorAll('.tag-btn').forEach(btn => btn.classList.remove('active'));
-        renderDisplay();
         showToast(isEdit ? '已更新' : '已存入');
       } catch (e) {
         logError(isEdit ? '更新紀錄失敗' : '新增紀錄失敗', e);
         showToast((isEdit ? '更新失敗' : '存入失敗') + ': ' + e.message);
+      } finally {
+        saving = false;
+        button.disabled = false;
+        renderEditState();
       }
     }
 
-    function prevDay() {
-      const d = new Date(currentDate);
-      d.setDate(d.getDate() - 1);
-      currentDate = d;
+    function setDate(date) {
+      currentDate = date;
       renderDatePicker();
       loadRecords();
     }
 
-    function nextDay() {
+    function shiftDay(offset) {
       const d = new Date(currentDate);
-      d.setDate(d.getDate() + 1);
-      currentDate = d;
-      renderDatePicker();
-      loadRecords();
+      d.setDate(d.getDate() + offset);
+      setDate(d);
+    }
+
+    function goToday() {
+      setDate(new Date());
+    }
+
+    // ---- 月曆 ----
+    function openCalendar() {
+      calendarMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      renderCalendar();
+      document.getElementById('calendar-overlay').classList.add('show');
+    }
+
+    function closeCalendar() {
+      document.getElementById('calendar-overlay').classList.remove('show');
+    }
+
+    function shiftCalendarMonth(offset) {
+      calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + offset, 1);
+      renderCalendar();
+    }
+
+    function pickCalendarDay(value) {
+      const picked = parseDate(value);
+      if (!picked) return;
+      closeCalendar();
+      setDate(picked);
+    }
+
+    function renderCalendar() {
+      const y = calendarMonth.getFullYear();
+      const m = calendarMonth.getMonth();
+      document.getElementById('cal-title').textContent = `${y} 年 ${m + 1} 月`;
+      const today = formatDate(new Date());
+      const selected = formatDate(currentDate);
+      const cells = ['日','一','二','三','四','五','六'].map(w => `<span class="cal-week">${w}</span>`);
+      for (let i = 0; i < new Date(y, m, 1).getDay(); i++) cells.push('<span></span>');
+      const days = new Date(y, m + 1, 0).getDate();
+      for (let d = 1; d <= days; d++) {
+        const value = formatDate(new Date(y, m, d));
+        const cls = ['cal-day', value === today ? 'today' : '', value === selected ? 'selected' : '']
+          .filter(Boolean).join(' ');
+        cells.push(`<button type="button" class="${cls}" onclick="pickCalendarDay('${value}')">${d}</button>`);
+      }
+      document.getElementById('cal-grid').innerHTML = cells.join('');
     }
 
     // ---- helpers ----
+    function splitTags(tag) {
+      return String(tag || '').split(',').map(t => t.trim()).filter(Boolean);
+    }
+
+    // 依按鈕順序輸出，讓同樣的組合永遠是同一個字串。
+    function joinTags(tags) {
+      const known = TAGS.map(t => t.value).filter(v => tags.has(v));
+      const others = [...tags].filter(v => !TAGS.some(t => t.value === v));
+      return [...known, ...others].join(',');
+    }
+
+    function recordIsIncome(r) {
+      return r.categoryId === 'income';
+    }
+
+    function money(cents) {
+      return '$' + (Math.abs(cents) / 100).toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+    }
+
     function escapeHTML(value) {
       const element = document.createElement('span');
       element.textContent = value;
@@ -683,12 +956,24 @@
       return `${y}-${m}-${day}`;
     }
 
+    function parseDate(value) {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+      const [y, m, d] = value.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      return formatDate(date) === value ? date : null;
+    }
+
     async function loadRecords() {
+      const version = ++loadVersion;
+      const date = formatDate(currentDate);
       try {
-        records = await requestJSON(`/api/records?date=${formatDate(currentDate)}`, {},
+        const data = await requestJSON(`/api/records?date=${date}`, {},
           data => Array.isArray(data) && data.every(isRecord));
+        if (version !== loadVersion) return;
+        records = data;
         renderRecords();
       } catch (error) {
+        if (version !== loadVersion) return;
         logError('載入記帳紀錄失敗', error);
         document.getElementById('records-list').innerHTML =
           '<div class="empty-hint">紀錄載入失敗，請重新選擇日期或整理頁面</div>';

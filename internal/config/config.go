@@ -15,6 +15,8 @@ type Config struct {
 	LiffID             string
 	GeminiAPIKey       string
 	GeminiModel        string
+	// 對外 HTTPS 網址（例如 https://example.ngrok.app），提醒訊息用來組「去記帳」連結。
+	PublicBaseURL string
 }
 
 // 從環境變數載入設定
@@ -31,6 +33,7 @@ func Load() *Config {
 		LiffID:             os.Getenv("LIFF_ID"),
 		GeminiAPIKey:       os.Getenv("GEMINI_API_KEY"),
 		GeminiModel:        getEnv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
 	}
 }
 

@@ -71,7 +71,7 @@ func main() {
 	}()
 	recHandler := record.NewHandler(db)
 	analyzer := record.NewAnalyzer(db, cfg.GeminiAPIKey, cfg.GeminiModel)
-	stopMealReminder := line.StartDailyMealReminder(db, client)
+	stopMealReminder := line.StartDailyMealReminder(db, client, cfg.PublicBaseURL)
 	defer stopMealReminder()
 
 	r := gin.Default()

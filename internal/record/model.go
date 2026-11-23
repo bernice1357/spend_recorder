@@ -12,6 +12,8 @@ type Record struct {
 	Date         string  `json:"date"`
 	CreatedAt    string  `json:"createdAt"`
 	LineUserID   string  `json:"lineUserId"`
+	// 查詢時由白名單帶出的記帳者顯示名稱，寫入時忽略。
+	RecorderName string `json:"recorderName"`
 }
 
 // 支出分類
@@ -23,6 +25,7 @@ type SpendCategory struct {
 
 // LINE 用戶白名單
 type LineUserWhitelist struct {
-	UserID    string `json:"userId"`
-	CreatedAt string `json:"createdAt"`
+	UserID      string `json:"userId"`
+	DisplayName string `json:"displayName"`
+	CreatedAt   string `json:"createdAt"`
 }
