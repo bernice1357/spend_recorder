@@ -175,7 +175,8 @@ func (q analysisQuery) filter() (string, []interface{}) {
 		args = append(args, q.Keyword, q.Keyword)
 	}
 	if q.Tag != "" {
-		conditions = append(conditions, "r.tag = ?")
+		// tag 欄位可能是「尼,午餐」這類逗號分隔的多選值，比對其中任一個完全相符。
+		conditions = append(conditions, "instr(',' || r.tag || ',', ',' || ? || ',') > 0")
 		args = append(args, q.Tag)
 	}
 	return " FROM records r LEFT JOIN spendCategories c ON c.id = r.category_id WHERE " +
