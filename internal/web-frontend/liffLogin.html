@@ -240,7 +240,8 @@
         const data = await requestJSON('/api/validate-line-userId', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: profile.userId })
+          // displayName 用於在紀錄上標示記帳者。
+          body: JSON.stringify({ userId: profile.userId, displayName: profile.displayName || '' })
         }, isValidationResult);
         sendLog(`白名單驗證結果: valid=${data.valid}`);
 

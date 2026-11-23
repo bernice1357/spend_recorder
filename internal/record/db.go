@@ -54,8 +54,9 @@ func InitDB(path string) (*sql.DB, error) {
 		icon TEXT NOT NULL DEFAULT ''
 	);
 	CREATE TABLE IF NOT EXISTS lineUserWhitelist (
-		user_id    TEXT PRIMARY KEY,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		user_id      TEXT PRIMARY KEY,
+		display_name TEXT NOT NULL DEFAULT '',
+		created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_records_category_id ON records(category_id);`
 
