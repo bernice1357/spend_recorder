@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -23,7 +24,12 @@ func InitDB(path string) (*sql.DB, error) {
 	params := url.Values{}
 	// DSN 設定會套用至連線池的每個新連線。
 	params.Set("_pragma", "foreign_keys(1)")
-	dsn := url.URL{Scheme: "file", Path: filepath.ToSlash(absPath), RawQuery: params.Encode()}
+	slashPath := filepath.ToSlash(absPath)
+	if !strings.HasPrefix(slashPath, "/") {
+		// Windows 的 C:/... 需寫成 file:///C:/...，否則磁碟代號會被當成 URI authority。
+		slashPath = "/" + slashPath
+	}
+	dsn := url.URL{Scheme: "file", Path: slashPath, RawQuery: params.Encode()}
 	db, err := sql.Open("sqlite", dsn.String())
 	if err != nil {
 		return nil, fmt.Errorf("開啟 SQLite 失敗: %w", err)
