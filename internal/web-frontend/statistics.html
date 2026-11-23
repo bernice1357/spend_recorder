@@ -30,9 +30,54 @@
       outline: 3px solid #148b9e;
       outline-offset: 4px;
     }
-    header { border-bottom: 1px solid #ddd; padding: 20px 16px; }
+    body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+    header { border-bottom: 1px solid #ddd; padding: 16px; }
     .header-inner { max-width: 680px; margin: auto; display: flex; align-items: center; gap: 16px; }
-    .back { color: inherit; text-decoration: none; white-space: nowrap; }
+    .bottom-nav {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      display: flex;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 10;
+    }
+    .bottom-nav a {
+      flex: 1;
+      text-align: center;
+      padding: 12px 0;
+      color: #777;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .bottom-nav a[aria-current="page"] { color: #1b7f43; box-shadow: inset 0 3px 0 #1b7f43; }
+    .income-rule {
+      background: #f6f6f6;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      color: #555;
+      line-height: 1.6;
+      margin: 12px 0 0;
+    }
+    .detail-toggle {
+      width: 100%;
+      border: 0;
+      border-top: 1px solid #ddd;
+      background: #fff;
+      text-align: left;
+    }
+    .detail-toggle .chevron { color: #999; font-size: 0.8rem; transition: transform 0.15s; }
+    .detail-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+    .detail-toggle[aria-expanded="true"] { background: #fffbea; }
+    .record-list { background: #fafafa; border-top: 1px solid #eee; }
+    .record-row { display: flex; gap: 12px; align-items: baseline; padding: 10px 16px 10px 44px; border-top: 1px solid #eee; font-size: 0.88rem; }
+    .record-row:first-child { border-top: 0; }
+    .record-date { color: #666; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .record-desc { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .record-desc small { display: block; color: #888; font-size: 0.75rem; margin-top: 2px; }
+    .record-amount { font-weight: 700; white-space: nowrap; }
     .tabs { display: flex; border: 2px solid #181818; border-radius: 12px; padding: 3px; flex: 1; }
     .tabs button { flex: 1; padding: 10px 6px; border: 0; border-radius: 8px; background: #fff; font-weight: 700; }
     .tabs button[aria-pressed="true"] { background: #ffd052; }
@@ -94,7 +139,7 @@
     .detail-heading { display: flex; align-items: center; justify-content: space-between; padding: 16px; }
     h2 { font-size: 1rem; margin: 0; }
     .sort { border: 0; background: none; font-size: 0.85rem; padding: 8px; }
-    .detail-row { display: flex; align-items: center; gap: 12px; padding: 18px 16px; border-top: 1px solid #ddd; }
+    .detail-row { display: flex; align-items: center; gap: 12px; padding: 18px 16px; }
     .detail-icon { font-size: 1.5rem; }
     .detail-name { flex: 1; overflow-wrap: anywhere; }
     .detail-amount { text-align: right; flex-shrink: 0; }
@@ -117,7 +162,6 @@
 <body>
   <header>
     <div class="header-inner">
-      <a class="back" href="/index.html">返回</a>
       <div class="tabs" role="group" aria-label="統計類型">
         <button type="button" data-mode="expense" aria-pressed="true">支出</button>
         <button type="button" data-mode="income" aria-pressed="false">收入</button>
@@ -132,6 +176,7 @@
       <input type="month" id="month" aria-label="統計月份" min="0001-01" max="9998-12" required />
       <button type="button" id="next-month" aria-label="下個月">下一月</button>
     </div>
+    <p class="income-rule">什麼算收入：只有「收入」分類算收入，其餘分類都算支出。</p>
     <p class="currency">金額單位：TWD</p>
     <div class="chart-toolbar" role="group" aria-label="圖表類型">
       <button type="button" data-chart="pie" aria-pressed="true">圓餅圖</button>
@@ -153,6 +198,10 @@
       </section>
     </section>
   </main>
+  <nav class="bottom-nav" aria-label="頁面切換">
+    <a href="/spendInput.html">記帳</a>
+    <a href="/statistics.html" aria-current="page">統計</a>
+  </nav>
   <script>
     const colors = ['#ef4070', '#ffbf16', '#f58c32', '#199bad', '#00bc94', '#8b68cf', '#4d82d9'];
     const monthInput = document.getElementById('month');
@@ -167,6 +216,7 @@
     let descending = true;
     let requestVersion = 0;
     let loaded = false;
+    const expanded = new Set();
     const money = cents => '$' + (cents / 100).toLocaleString('zh-TW', { maximumFractionDigits: 2 });
 
     function element(tag, className, text) {
@@ -203,6 +253,7 @@
           value => Array.isArray(value) && value.every(isRecord));
         if (version !== requestVersion) return;
         monthlyRecords = data;
+        expanded.clear();
         loaded = true;
         status.hidden = true;
         document.getElementById('results').hidden = false;
@@ -220,21 +271,27 @@
       const groups = new Map();
       let income = 0;
       let expense = 0;
+      const incomeRecords = [];
+      const expenseRecords = [];
       monthlyRecords.forEach(record => {
         const cents = Math.round(record.amount * 100);
         const isIncome = record.categoryId === 'income';
-        if (isIncome) income += cents;
-        else expense += cents;
+        if (isIncome) { income += cents; incomeRecords.push(record); }
+        else { expense += cents; expenseRecords.push(record); }
         if (mode === 'balance' || isIncome !== (mode === 'income')) return;
         if (!groups.has(record.categoryId)) {
           groups.set(record.categoryId, {
-            name: record.categoryName || '未命名分類', icon: record.categoryIcon || '', amount: 0,
+            key: record.categoryId,
+            name: record.categoryName || '未命名分類', icon: record.categoryIcon || '', amount: 0, records: [],
           });
         }
-        groups.get(record.categoryId).amount += cents;
+        const group = groups.get(record.categoryId);
+        group.amount += cents;
+        group.records.push(record);
       });
       let rows = mode === 'balance'
-        ? [{ name: '收入', amount: income }, { name: '支出', amount: expense }]
+        ? [{ key: 'balance:income', name: '收入', amount: income, records: incomeRecords },
+           { key: 'balance:expense', name: '支出', amount: expense, records: expenseRecords }]
         : [...groups.values()];
       rows.sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, 'zh-TW'));
       rows = rows.map((row, index) => ({ ...row, color: colors[index % colors.length] }));
@@ -311,13 +368,45 @@
       if (!rows.length) details.append(element('p', 'message', '本月尚無紀錄'));
       const sorted = descending ? rows : [...rows].reverse();
       sorted.forEach(row => {
-        const item = element('div', 'detail-row');
+        const open = expanded.has(row.key);
+        const listId = 'records-' + row.key.replace(/[^\w-]/g, '_');
+        const item = element('button', 'detail-row detail-toggle');
+        item.type = 'button';
+        item.setAttribute('aria-expanded', String(open));
+        item.setAttribute('aria-controls', listId);
         const marker = element('span', 'swatch');
         marker.style.background = row.color;
-        item.append(marker, element('span', 'detail-icon', row.icon || ''), element('span', 'detail-name', row.name));
-        item.append(element('strong', 'detail-amount', money(row.amount)));
+        const name = element('span', 'detail-name', row.name);
+        name.append(element('small', 'note', ' ' + row.records.length + ' 筆'));
+        item.append(element('span', 'chevron', '▶'), marker,
+          element('span', 'detail-icon', row.icon || ''), name,
+          element('strong', 'detail-amount', money(row.amount)));
+        item.addEventListener('click', () => {
+          if (expanded.has(row.key)) expanded.delete(row.key); else expanded.add(row.key);
+          render();
+        });
         details.append(item);
+        if (open) details.append(renderRecordList(row.records, listId));
       });
+    }
+
+    function renderRecordList(records, id) {
+      const list = element('div', 'record-list');
+      list.id = id;
+      const sorted = [...records].sort((a, b) =>
+        b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt)));
+      sorted.forEach(record => {
+        const row = element('div', 'record-row');
+        const desc = element('span', 'record-desc', record.note || record.categoryName || '（無備註）');
+        const tags = String(record.tag || '').split(',').filter(Boolean).join('、');
+        const meta = [record.categoryName, record.recorderName ? record.recorderName + ' 記' : '', tags]
+          .filter(Boolean).join(' · ');
+        if (meta) desc.append(element('small', '', meta));
+        row.append(element('span', 'record-date', record.date.slice(5).replace('-', '/')), desc,
+          element('span', 'record-amount', money(Math.round(record.amount * 100))));
+        list.append(row);
+      });
+      return list;
     }
 
     document.getElementById('previous-month').addEventListener('click', () => changeMonth(-1));
