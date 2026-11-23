@@ -15,7 +15,8 @@
 | 每日提醒 | 台灣時間每天 20:00 檢查共用帳本，缺少早餐、午餐或晚餐任一類紀錄時，私訊白名單使用者。 |
 
 金額初始為 `0`，點入欄位時清除預設 `0`，空白離開則恢復 `0`；儲存成功後也重設為 `0`。
-分類選取時，四邊框線與底色會變色。tag 提供「尼」、「拿」與房屋圖示，為單選，再次點選可取消，編輯時帶入原 tag。
+分類選取時，四邊框線與底色會變色。tag 提供「尼」、「拿」、房屋圖示與「早餐」、「午餐」、「晚餐」，可複選，再次點選可取消；多個 tag 以逗號分隔存入同一欄位（例如 `尼,午餐`），編輯時帶入原 tag。
+點選一筆紀錄即進入修改狀態，可更新、取消或刪除。點日期可開啟月曆跳到指定日期。
 
 ## 目錄結構
 
@@ -31,7 +32,8 @@ cash_carole_record/
 │   └── README.md                   # 架構、檔案職責與流程索引
 ├── migrations/
 │   ├── 001_records_category_foreign_key.sql
-│   └── 002_records_line_user_id.sql
+│   ├── 002_records_line_user_id.sql
+│   └── 003_whitelist_display_name.sql
 ├── data/
 │   ├── records.db                  # SQLite 資料庫
 │   └── backups/                    # 資料庫備份
@@ -131,6 +133,7 @@ Copy-Item .env.example .env
 | `LIFF_ID` | 前端登入必填 | LIFF 應用程式 ID，前端從 `/api/liff-config` 取得；未設定時登入頁顯示錯誤。 |
 | `GEMINI_API_KEY` | 記帳問答需要 | 未設定時，LINE 問答回覆設定提示。 |
 | `GEMINI_MODEL` | 否 | 程式預設為 `gemini-3.5-flash-lite`；此變數可自行加入 `.env`。 |
+| `PUBLIC_BASE_URL` | 否 | 對外 HTTPS 網址。設定後，三餐提醒會附「去記帳」按鈕，開啟當天記帳頁並預選缺少的餐別；未設定時只傳文字。 |
 
 `.gitignore` 忽略 `.env`、`data/`、`logs/` 與 `.DS_Store`，`.env.example` 保留供提交。
 建表程式與 `migrations/` 內的 SQL 應提交 Git；實際資料庫與備份不提交。
@@ -197,6 +200,7 @@ LIFF 的 `LIFF_ID` 則用於前端 LINE 登入；它是應用程式 ID，不是�
 目前白名單檢查依前端傳送的 ID 進行，不等於驗證 LINE 登入憑證。
 查詢、統計、Gemini 問答與每日三餐檢查仍使用共用帳本，不依作者分開。
 `income` 分類視為收入，其餘分類視為支出。
+記帳頁每筆紀錄會標示記帳者，名稱來自 `lineUserWhitelist.display_name`，於使用者從 LINE 登入時自動更新。
 
 `records.category_id` 參照 `spendCategories.id`，使用 `ON UPDATE CASCADE ON DELETE RESTRICT`：
 分類 ID 更新會同步更新記帳，仍被使用的分類不能刪除。分類欄位有 `idx_records_category_id` 索引。
@@ -211,6 +215,7 @@ LIFF 的 `LIFF_ID` 則用於前端 LINE 登入；它是應用程式 ID，不是�
 | --- | --- |
 | `001_records_category_foreign_key.sql` | 尚未有分類外鍵時，重建記帳表、保留原始 ID 與遞增序號，加入分類外鍵與索引。 |
 | `002_records_line_user_id.sql` | 尚未有 `line_user_id` 時新增欄位，並將既有紀錄作者填為此帳本擁有者先前指定的 ID；此值已寫在 SQL 內。 |
+| `003_whitelist_display_name.sql` | 尚未有 `lineUserWhitelist.display_name` 時新增欄位，用於標示記帳者。新版程式需要此欄位，部署前必須先執行。 |
 
 兩份都需要時，先執行 `001` 再執行 `002`。不要重複執行；`001` 的舊版重建結構不包含作者欄位，
 不可在已新增作者欄位後直接套用。使用其他帳本時，先確認 `002` 的作者值符合資料歸屬。
@@ -232,7 +237,7 @@ LIFF 的 `LIFF_ID` 則用於前端 LINE 登入；它是應用程式 ID，不是�
 後端服務每天台灣時間（UTC+8）20:00，檢查當天共用帳本：
 
 - 以 `records.date` 判斷日期，透過分類 ID 取得分類名稱。
-- 分類名稱完全符合「早餐」、「午餐」、「晚餐」，各至少一筆才不提醒；不依記帳者、tag 或金額篩選。
+- 當天紀錄的 tag 含「早餐」、「午餐」、「晚餐」（或舊資料的同名分類），各至少一筆才不提醒；不依記帳者或金額篩選。
 - 缺少任一餐時，透過 LINE Push 私訊每位白名單使用者，列出缺少的餐別。
 - 查詢失敗不發送；個別推播失敗則記錄日誌並繼續其他收件者。
 
