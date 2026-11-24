@@ -206,7 +206,7 @@ Gemini 單次 HTTP 呼叫上限為 20 秒；LINE API client 的 HTTP 呼叫上�
 | [model.go](../internal/record/model.go) | `Record`、`SpendCategory` 與 `LineUserWhitelist` 資料結構，以及 API JSON 欄位名稱。 |
 | [db.go](../internal/record/db.go) | `InitDB()` 先自動建立資料庫父目錄，再開啟 SQLite 連線；包含三張資料表的建表 SQL、記帳分類外鍵與索引，以及分類表為空時寫入的 13 個預設分類。透過 DSN 為每個連線啟用外鍵檢查；建立目錄或初始化失敗會回傳錯誤，由主程式記錄。 |
 | [handler.go](../internal/record/handler.go) | 記帳新增、查詢、修改、刪除，分類查詢與新增，以及 LINE 白名單驗證的 Gin handler。包含參數解析、SQL 執行、結果讀取與錯誤日誌。 |
-| [mealReminder.go](../internal/record/mealReminder.go) | 查詢指定日期的共用帳本，依分類名稱完全符合「早餐」、「午餐」、「晚餐」判斷各餐是否至少有一筆，回傳缺少的餐別；不依作者、tag 或金額篩選。 |
+| [mealReminder.go](../internal/record/mealReminder.go) | 查詢指定日期的共用帳本，依分類名稱完全符合「早餐」、「午餐」、「晚餐」（或舊資料的同名 tag）判斷各餐是否至少有一筆，回傳缺少的餐別；不依作者或金額篩選。 |
 | [analyzer.go](../internal/record/analyzer.go) | Gemini 問答服務。`Answer()` 處理問題與使用者提示；`analyze()` 規劃查詢並整理答案；`generate()` 呼叫 Gemini；`analysisPlanSchema()` 定義模型須回傳的查詢格式。 |
 | [analysisQuery.go](../internal/record/analysisQuery.go) | 問答用的查詢條件、統計與明細結果結構。驗證日期、分類、排序與筆數，組合參數化唯讀 SQL，查詢完整總計、分組統計與明細。 |
 

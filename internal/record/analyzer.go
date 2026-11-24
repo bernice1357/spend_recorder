@@ -83,7 +83,8 @@ categoryId=income 為收入，其餘為支出；金額為原始記帳單位，�
 queries 最多 4 個，每個包含 label、startDate、endDate、categoryIds、kind、keyword、tag、groupBy、details、order、limit。
 沒有日期限制時日期填空字串；比較不同期間時分成多個 query。
 categoryIds 從提供的分類中選擇，不限分類時填空陣列。kind 為 all、income 或 expense。
-tag 可複選，以逗號分隔儲存（例如「尼,午餐」），可用值為尼、拿、🏠、早餐、午餐、晚餐；早餐、午餐、晚餐的餐費以 tag 標記而非分類。
+tag 表示這筆由誰出錢，新紀錄只會有一個，舊紀錄可能以逗號分隔多個（例如「尼,午餐」），可用值為尼、拿、🏠；尼或拿代表由該人代墊，🏠 代表家裡出錢，沒有 tag 代表記帳者自己出錢。
+早餐、午餐、晚餐的餐費以同名分類記錄，查詢餐費時用 categoryIds 篩選；舊紀錄可能以早餐、午餐、晚餐 tag 標記，需要涵蓋舊資料時可另加 tag 查詢。
 keyword 是 tag 或 note 的字面子字串搜尋，無條件填空字串；tag 篩選單一標記，紀錄含該標記即符合，無條件填空字串。
 groupBy=tag 時以整組 tag 字串分組。
 groupBy 為 none、category、day、month 或 tag，每次查詢最多回傳 100 組，仍會提供完整總計。

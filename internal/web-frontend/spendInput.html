@@ -483,14 +483,12 @@
       if (e.touches.length > 1) e.preventDefault();
     }, { passive: false });
 
-    // 標記可複選，存成依此順序、以逗號分隔的字串（例如「尼,午餐」）。
+    // 標記表示這筆由誰出錢，單選；與舊資料的其他標記一起依此順序存成逗號分隔字串（例如「尼,午餐」）。
+    // 三餐改用同名分類記錄；舊紀錄上的三餐標記仍會顯示並在編輯時保留。
     const TAGS = [
       { value: '尼', label: '尼' },
       { value: '拿', label: '拿' },
       { value: '\u{1F3E0}', label: '\u{1F3E0}', aria: '房屋' },
-      { value: '早餐', label: '早餐' },
-      { value: '午餐', label: '午餐' },
-      { value: '晚餐', label: '晚餐' },
     ];
 
     // ---- state ----
@@ -508,12 +506,11 @@
     let records = [];
     let loadVersion = 0;
 
-    // 三餐提醒連結：?date=YYYY-MM-DD&meal=午餐，開啟該日並預選對應的餐別標記。
+    // 三餐提醒連結：?date=YYYY-MM-DD&meal=午餐，開啟該日並在分類載入後預選同名分類。
     const params = new URLSearchParams(window.location.search);
     const linkedDate = parseDate(params.get('date'));
     if (linkedDate) currentDate = linkedDate;
-    const linkedMeal = params.get('meal');
-    if (TAGS.some(t => t.value === linkedMeal)) selectedTags.add(linkedMeal);
+    let pendingMealCategoryName = params.get('meal');
 
     // ---- init ----
     const amountInput = document.getElementById('number-input');
@@ -565,6 +562,12 @@
           `;
         }
         return;
+      }
+      // 只在第一次載入時套用連結指定的餐別，之後重新載入分類不覆蓋使用者的選擇。
+      if (pendingMealCategoryName) {
+        const mealCategory = CATEGORIES.find(c => c.name === pendingMealCategoryName);
+        if (mealCategory && !selectedCat && !editingRecord) selectedCat = mealCategory;
+        pendingMealCategoryName = null;
       }
       renderCategories();
     }
@@ -678,8 +681,14 @@
     }
 
     // ---- actions ----
+    // 出錢者單選：選取新的標記時取消其他出錢者，再點一次取消；舊資料的其他標記保留。
     function toggleTag(tag) {
-      if (selectedTags.has(tag)) selectedTags.delete(tag); else selectedTags.add(tag);
+      if (selectedTags.has(tag)) {
+        selectedTags.delete(tag);
+      } else {
+        TAGS.forEach(t => selectedTags.delete(t.value));
+        selectedTags.add(tag);
+      }
       renderTags();
     }
 
