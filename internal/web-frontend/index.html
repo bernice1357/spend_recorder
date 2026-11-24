@@ -10,7 +10,8 @@
       window.location.pathname + window.location.search + window.location.hash
     );
     try {
-      if (!localStorage.getItem('lineUserId')) {
+      // 尚未同步 LINE 顯示名稱的舊登入狀態，也需重新登入一次補上名稱。
+      if (!localStorage.getItem('lineUserId') || !localStorage.getItem('lineProfileSynced')) {
         window.location.replace(loginURL);
       }
     } catch (error) {
