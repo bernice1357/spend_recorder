@@ -34,6 +34,8 @@ cash_carole_record/
 │   ├── 001_records_category_foreign_key.sql
 │   ├── 002_records_line_user_id.sql
 │   └── 003_whitelist_display_name.sql
+├── scripts/
+│   └── sql/backfill-display-name/  # 可選的一次性 SQL：補填記帳者名稱
 ├── data/
 │   ├── records.db                  # SQLite 資料庫
 │   └── backups/                    # 資料庫備份
@@ -221,6 +223,20 @@ LIFF 的 `LIFF_ID` 則用於前端 LINE 登入；它是應用程式 ID，不是�
 不可在已新增作者欄位後直接套用。使用其他帳本時，先確認 `002` 的作者值符合資料歸屬。
 執行前檢查孤立分類紀錄、額外欄位、索引、trigger、view 與其他表參照；遇錯應停止並回滾，
 提交前核對資料與結構。更完整的檔案職責見 [專案工作文件](docs/README.md)。
+
+### 補填記帳者名稱（可選）
+
+`scripts/sql/backfill-display-name/` 內的 SQL 不是遷移，不需每個環境執行。
+名稱同步修正部署後，使用者重新開啟頁面會自動補上名稱；
+若想在部署前先讓正式機顯示記帳者名稱，可手動執行：
+
+1. `sqlite3 data/records.db ".read scripts/sql/backfill-display-name/1_find_users.sql"`，
+   依每個 userId 的紀錄判斷對應的使用者（只讀）。
+2. 在伺服器上將 `2_set_names.sql` 的 `A_ID`／`B_ID` 與名稱換成實際值後，以同樣方式執行。
+3. 執行後以 `git checkout -- scripts/sql/backfill-display-name/2_set_names.sql` 還原，
+   不要提交含實際 userId 的檔案。
+
+手動填入的名稱會在使用者下次完整登入時被 LINE 顯示名稱覆蓋。
 
 ## 每月統計
 
