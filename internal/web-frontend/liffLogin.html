@@ -64,6 +64,8 @@
     const app = document.getElementById('app');
     const loginAttemptKey = 'liffLoginAttemptAt';
     const returnTargetKey = 'liffReturnTo';
+    // 完整登入並送出 LINE 顯示名稱後才設定；沒有此標記的舊登入狀態需重新走完整登入。
+    const profileSyncedKey = 'lineProfileSynced';
     const allowedReturnPaths = new Set(['/', '/index.html', '/spendInput.html', '/statistics.html']);
     const callbackParameters = new URLSearchParams(window.location.search);
     const callbackFragment = new URLSearchParams(window.location.hash.slice(1));
@@ -178,10 +180,15 @@
       try {
         loginStage = '確認返回頁面';
         returnTarget = resolveReturnTarget();
-        // 如果 localStorage 已有 userId，先重新驗證
+        // localStorage 已有 userId 且已同步過顯示名稱時，只重新驗證白名單；
+        // 未同步過名稱時改走完整登入，才能取得 LINE 顯示名稱。
         loginStage = '讀取登入狀態';
         const savedUserId = hasLoginCallback ? null : localStorage.getItem('lineUserId');
-        if (savedUserId) {
+        const profileSynced = localStorage.getItem(profileSyncedKey) === '1';
+        if (savedUserId && !profileSynced) {
+          sendLog('尚未同步 LINE 顯示名稱，改走完整登入');
+        }
+        if (savedUserId && profileSynced) {
           loginStage = '重新驗證白名單';
           sendLog('localStorage 有登入狀態，重新驗證中');
           showLoading('驗證中...');
@@ -195,6 +202,7 @@
             return;
           }
           localStorage.removeItem('lineUserId');
+          localStorage.removeItem(profileSyncedKey);
         }
 
         // 從後端取得 LIFF_ID
@@ -253,6 +261,7 @@
         // 驗證通過，存 userId 並跳轉
         loginStage = '儲存登入狀態';
         localStorage.setItem('lineUserId', profile.userId);
+        localStorage.setItem(profileSyncedKey, '1');
         returnToOriginalPage('驗證通過');
 
       } catch (err) {

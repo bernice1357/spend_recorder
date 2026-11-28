@@ -12,6 +12,13 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// 三餐分類，名稱需與 MissingMeals 檢查的餐別一致。
+var mealCategories = []SpendCategory{
+	{"breakfast", "早餐", "🍳"},
+	{"lunch", "午餐", "🍱"},
+	{"dinner", "晚餐", "🍲"},
+}
+
 // 初始化 SQLite 連線並建表
 func InitDB(path string) (*sql.DB, error) {
 	absPath, err := filepath.Abs(path)
@@ -100,6 +107,25 @@ func InitDB(path string) (*sql.DB, error) {
 				}
 				return nil, fmt.Errorf("寫入預設分類失敗: category_id=%s: %w", c.ID, err)
 			}
+			count++
+		}
+	}
+
+	// 三餐提醒依同名分類判斷；既有資料庫缺少時補建，已有同名或同 ID 分類則略過。
+	for _, c := range mealCategories {
+		res, err := db.Exec(
+			`INSERT OR IGNORE INTO spendCategories (id, name, icon)
+			 SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM spendCategories WHERE name = ?)`,
+			c.ID, c.Name, c.Icon, c.Name,
+		)
+		if err != nil {
+			if closeErr := db.Close(); closeErr != nil {
+				log.Printf("[record] 三餐分類寫入失敗後關閉連線失敗: %v", closeErr)
+			}
+			return nil, fmt.Errorf("寫入三餐分類失敗: category_id=%s: %w", c.ID, err)
+		}
+		if n, err := res.RowsAffected(); err == nil && n > 0 {
+			log.Printf("[record] 已補建三餐分類: category_id=%s", c.ID)
 			count++
 		}
 	}
